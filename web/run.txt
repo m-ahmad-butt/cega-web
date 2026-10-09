@@ -3,13 +3,3 @@ docker compose --env-file frontend/.env --env-file backend/.env up --build
 
 # Production:
 docker compose -f docker-compose.prod.yml --env-file frontend/.env --env-file backend/.env up -d --build
-
-
-blue_ip = "3.108.49.218"
-bucket_name = "server-web-public-9e24545e749ad3c838553e9449"
-bucket_url = "https://server-web-public-9e24545e749ad3c838553e9449.s3.ap-south-1.amazonaws.com"       
-green_ip = "3.7.93.239"
-instance_type = "m7i-flex.large"
-pem_file = "./server-web.pem"
-production_ip = "3.7.93.239"
-staging_ip = "3.108.49.218"

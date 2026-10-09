@@ -5,8 +5,10 @@
 #   web-production  → green / production
 #
 # CI/CD File variables:
-#   BACKEND_ENV / FRONTEND_ENV                 → production (required)
-#   BACKEND_ENV_STAGING / FRONTEND_ENV_STAGING → staging (optional; falls back)
+#   BACKEND_ENV / FRONTEND_ENV / AGENT_ENV                 → production (required)
+#   BACKEND_ENV_STAGING / FRONTEND_ENV_STAGING / AGENT_ENV_STAGING → staging (optional; falls back)
+#
+# The app is in web/. Jobs run from that directory.
 #
 # Optional variables:
 #   DOMAIN           → web-comp.duckdns.org
@@ -30,6 +32,10 @@ stages:
   - production
   - init
   - restart
+
+default:
+  before_script:
+    - cd web
 
 variables:
   COMPOSE_FILE: "docker-compose.prod.yml"
@@ -82,6 +88,18 @@ build:frontend:
     - if: $CI_PIPELINE_SOURCE == "merge_request_event"
       when: manual
 
+build:agent:
+  stage: build
+  tags:
+    - web-staging
+  script:
+    - docker compose -f "$COMPOSE_FILE" build agent
+  rules:
+    - if: $CI_COMMIT_BRANCH == "main"
+      when: manual
+    - if: $CI_PIPELINE_SOURCE == "merge_request_event"
+      when: manual
+
 # ---------------------------------------------------------------------------
 # TEST — on staging (blue) runner
 # ---------------------------------------------------------------------------
@@ -109,11 +127,18 @@ test:smoke:
     - web-staging
   needs:
     - build:backend
+    - build:agent
   variables:
     COMPOSE_PROJECT_NAME: "web-comp-ci"
   script:
+    - |
+      if [ -z "${AGENT_ENV:-}" ] || [ ! -f "${AGENT_ENV}" ]; then
+        echo "Missing CI variable AGENT_ENV (Type: File)."
+        exit 1
+      fi
     - cp "${BACKEND_ENV}" backend/.env
     - cp "${FRONTEND_ENV}" frontend/.env
+    - cp "${AGENT_ENV}" agent/.env
     - |
       set -e
       COMPOSE="docker compose -p web-comp-ci -f $COMPOSE_FILE -f $COMPOSE_CI_FILE --env-file backend/.env --env-file frontend/.env"
@@ -157,12 +182,14 @@ test:smoke:
         if [ "$i" -eq 60 ]; then
           echo "Backend health check failed"
           docker logs --tail=120 ci-backend || true
+          docker logs --tail=80 ci-agent || true
           exit 1
         fi
       done
       $COMPOSE run --rm --no-deps -e SMOKE_BASE_URL=http://backend:3001 backend npm run test:smoke
   after_script:
-    - docker compose -p web-comp-ci -f "$COMPOSE_FILE" -f "$COMPOSE_CI_FILE" --env-file backend/.env --env-file frontend/.env down --remove-orphans -v || true
+    - cd web
+    - docker compose -p web-comp-ci -f "$COMPOSE_FILE" -f "$COMPOSE_CI_FILE" --env-file backend/.env --env-file frontend/.env --env-file agent/.env down --remove-orphans -v || true
   rules:
     - if: $CI_COMMIT_BRANCH == "main"
       when: manual

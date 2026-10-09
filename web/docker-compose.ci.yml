@@ -39,6 +39,9 @@ services:
       retries: 12
       start_period: 40s
 
+  agent:
+    container_name: ci-agent
+
   backend:
     container_name: ci-backend
     ports: !reset []

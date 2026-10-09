@@ -4,6 +4,12 @@ set -euo pipefail
 export APP_ENV="${APP_ENV:-production}"
 export COMPOSE_FILE="${COMPOSE_FILE:-docker-compose.prod.yml}"
 
+# App lives in web/ when the Git checkout root is the parent repo.
+if [ -z "${APP_DIR:-}" ]; then
+  APP_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)"
+fi
+export APP_DIR
+
 # Staging may use dedicated File variables; otherwise fall back to production ones.
 if [ "${APP_ENV}" = "staging" ]; then
   if [ -n "${BACKEND_ENV_STAGING:-}" ] && [ -f "${BACKEND_ENV_STAGING}" ]; then
@@ -11,6 +17,9 @@ if [ "${APP_ENV}" = "staging" ]; then
   fi
   if [ -n "${FRONTEND_ENV_STAGING:-}" ] && [ -f "${FRONTEND_ENV_STAGING}" ]; then
     export FRONTEND_ENV="${FRONTEND_ENV_STAGING}"
+  fi
+  if [ -n "${AGENT_ENV_STAGING:-}" ] && [ -f "${AGENT_ENV_STAGING}" ]; then
+    export AGENT_ENV="${AGENT_ENV_STAGING}"
   fi
   export DOMAIN="${DOMAIN:-${STAGING_DOMAIN:-web-comp-stage.duckdns.org}}"
   export COMPOSE_PROJECT_NAME="${COMPOSE_PROJECT_NAME:-web-comp-stage}"
@@ -30,6 +39,11 @@ fi
 
 if [ -z "${FRONTEND_ENV:-}" ] || [ ! -f "${FRONTEND_ENV}" ]; then
   echo "Missing CI variable FRONTEND_ENV (Type: File)."
+  exit 1
+fi
+
+if [ -z "${AGENT_ENV:-}" ] || [ ! -f "${AGENT_ENV}" ]; then
+  echo "Missing CI variable AGENT_ENV (Type: File)."
   exit 1
 fi
 

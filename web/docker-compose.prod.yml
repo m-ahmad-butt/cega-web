@@ -77,6 +77,29 @@ services:
       start_period: 30s
     restart: unless-stopped
 
+  agent:
+    build:
+      context: ./agent
+      dockerfile: Dockerfile
+    image: examslot-agent:prod
+    container_name: examslot-agent
+    env_file:
+      - ./agent/.env
+    environment:
+      REDIS_URL: redis://:123123123@redis:6379
+    networks:
+      - hackathon-network
+    depends_on:
+      redis:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8002/health"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+      start_period: 20s
+    restart: unless-stopped
+
   backend:
     build:
       context: ./backend
@@ -90,6 +113,7 @@ services:
       - ./backend/.env
     environment:
       NODE_ENV: production
+      AGENT_URL: http://agent:8002
     networks:
       - hackathon-network
     depends_on:
@@ -98,6 +122,8 @@ services:
       redis:
         condition: service_healthy
       rabbitmq:
+        condition: service_healthy
+      agent:
         condition: service_healthy
     restart: unless-stopped
 

@@ -2,14 +2,16 @@
 # Bring the stack up, then host nginx + DuckDNS TLS (CI init stage).
 set -euo pipefail
 
-ROOT_DIR="${CI_PROJECT_DIR:-$(cd "$(dirname "$0")/../.." && pwd)}"
-source "${ROOT_DIR}/scripts/ci/resolve-env.sh"
+HERE="$(cd "$(dirname "$0")" && pwd)"
+# shellcheck disable=SC1091
+source "${HERE}/resolve-env.sh"
+ROOT_DIR="${APP_DIR}"
 
 CERTBOT_EMAIL="${CERTBOT_EMAIL:-}"
 DUCKDNS_TOKEN="${DUCKDNS_TOKEN:-}"
 
-if [ ! -f "${DEPLOY_DIR}/backend/.env" ] || [ ! -f "${DEPLOY_DIR}/frontend/.env" ]; then
-  echo "Missing ${DEPLOY_DIR}/backend/.env or frontend/.env — run deploy:${APP_ENV} first." >&2
+if [ ! -f "${DEPLOY_DIR}/backend/.env" ] || [ ! -f "${DEPLOY_DIR}/frontend/.env" ] || [ ! -f "${DEPLOY_DIR}/agent/.env" ]; then
+  echo "Missing ${DEPLOY_DIR} env files — run deploy:${APP_ENV} first." >&2
   exit 1
 fi
 
@@ -26,6 +28,7 @@ cd "${DEPLOY_DIR}"
 docker compose \
   --env-file backend/.env \
   --env-file frontend/.env \
+  --env-file agent/.env \
   -f "${COMPOSE_FILE}" \
   up -d --build --remove-orphans
 
