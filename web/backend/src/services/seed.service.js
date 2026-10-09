@@ -9,12 +9,16 @@ const seedAdmin = async () => {
   });
 
   if (existing) {
-    existing.email = email;
+    if (process.env.NODE_ENV !== 'production') {
+      existing.email = email;
+      existing.password = hashed;
+    }
     existing.fullName = existing.fullName || 'VU Admin';
-    existing.password = hashed;
     existing.role = 'ADMIN';
     existing.isVerified = true;
     await existing.save();
+    console.log(`[SEED] Admin kept: ${existing.email}`);
+    return;
   } else {
     await User.create({
       email,
@@ -23,8 +27,8 @@ const seedAdmin = async () => {
       role: 'ADMIN',
       isVerified: true,
     });
+    console.log(`[SEED] Admin created: ${email}`);
   }
-  console.log(`[SEED] Admin ensured: ${email}`);
 };
 
 const seedBranches = async () => {
@@ -223,6 +227,12 @@ const seedAssignmentsAndSlots = async () => {
 const seedAll = async () => {
   try {
     await seedAdmin();
+    const demo = process.env.SEED_DEMO === 'true'
+      || (process.env.SEED_DEMO !== 'false' && process.env.NODE_ENV !== 'production');
+    if (!demo) {
+      console.log('[SEED] Demo data skipped. Admin account kept.');
+      return;
+    }
     await seedBranches();
     await seedCourses();
     await seedStudents();

@@ -1,25 +1,3 @@
-# Blue (staging) + Green (production)
-#
-# Runner tags (shell executor on each EC2):
-#   web-staging     → blue  / staging
-#   web-production  → green / production
-#
-# CI/CD File variables:
-#   BACKEND_ENV / FRONTEND_ENV / AGENT_ENV                 → production (required)
-#   BACKEND_ENV_STAGING / FRONTEND_ENV_STAGING / AGENT_ENV_STAGING → staging (optional; falls back)
-#
-# The app is in web/. Jobs run from that directory.
-#
-# Optional variables:
-#   DOMAIN           → web-comp.duckdns.org
-#   STAGING_DOMAIN   → web-comp-stage.duckdns.org
-#   CERTBOT_EMAIL    → required for init TLS
-#   DUCKDNS_TOKEN    → optional DuckDNS refresh
-#
-# Flow on staging runner: build → test → deploy:staging
-# Flow on production runner: deploy:production (after staging)
-# init/restart = compose bring-up only (nginx/TLS is manual — see aws.md)
-
 workflow:
   rules:
     - if: $CI_COMMIT_BRANCH == "main"
@@ -32,6 +10,7 @@ stages:
   - production
   - init
   - restart
+  - truncate
 
 default:
   before_script:
@@ -45,10 +24,6 @@ variables:
   DOMAIN: "web-comp.duckdns.org"
   STAGING_DOMAIN: "web-comp-stage.duckdns.org"
   FF_USE_FASTZIP: "true"
-
-# ---------------------------------------------------------------------------
-# BUILD — on staging (blue) runner
-# ---------------------------------------------------------------------------
 
 build:backend:
   stage: build
@@ -91,10 +66,6 @@ build:agent:
       when: manual
     - if: $CI_PIPELINE_SOURCE == "merge_request_event"
       when: manual
-
-# ---------------------------------------------------------------------------
-# TEST — on staging (blue) runner
-# ---------------------------------------------------------------------------
 
 test:unit:
   stage: test
@@ -181,10 +152,6 @@ test:smoke:
     - if: $CI_PIPELINE_SOURCE == "merge_request_event"
       when: manual
 
-# ---------------------------------------------------------------------------
-# STAGING (blue)
-# ---------------------------------------------------------------------------
-
 deploy:staging:
   stage: staging
   tags:
@@ -207,10 +174,6 @@ deploy:staging:
     - if: $CI_COMMIT_BRANCH == "main"
       when: manual
 
-# ---------------------------------------------------------------------------
-# PRODUCTION (green)
-# ---------------------------------------------------------------------------
-
 deploy:production:
   stage: production
   tags:
@@ -230,10 +193,6 @@ deploy:production:
   rules:
     - if: $CI_COMMIT_BRANCH == "main"
       when: manual
-
-# ---------------------------------------------------------------------------
-# INIT — nginx + DuckDNS TLS (once per environment)
-# ---------------------------------------------------------------------------
 
 init:staging:
   stage: init
@@ -274,10 +233,6 @@ init:production:
     - if: $CI_COMMIT_BRANCH == "main"
       when: manual
 
-# ---------------------------------------------------------------------------
-# RESTART — redeploy compose stack without TLS setup
-# ---------------------------------------------------------------------------
-
 restart:staging:
   stage: restart
   tags:
@@ -313,6 +268,46 @@ restart:production:
   script:
     - chmod +x scripts/ci/*.sh scripts/*.sh 2>/dev/null || true
     - bash scripts/ci/restart.sh
+  rules:
+    - if: $CI_COMMIT_BRANCH == "main"
+      when: manual
+
+
+truncate:staging:
+  stage: truncate
+  tags:
+    - web-staging
+  needs: []
+  variables:
+    APP_ENV: "staging"
+    DOMAIN: $STAGING_DOMAIN
+    COMPOSE_PROJECT_NAME: "web-comp-stage"
+    DEPLOY_DIR: "/opt/web-comp-stage"
+  environment:
+    name: staging
+    url: https://web-comp-stage.duckdns.org
+  script:
+    - chmod +x scripts/ci/*.sh scripts/*.sh 2>/dev/null || true
+    - bash scripts/ci/truncate.sh
+  rules:
+    - if: $CI_COMMIT_BRANCH == "main"
+      when: manual
+
+truncate:production:
+  stage: truncate
+  tags:
+    - web-production
+  needs: []
+  variables:
+    APP_ENV: "production"
+    COMPOSE_PROJECT_NAME: "web-comp"
+    DEPLOY_DIR: "/opt/web-comp"
+  environment:
+    name: production
+    url: https://web-comp.duckdns.org
+  script:
+    - chmod +x scripts/ci/*.sh scripts/*.sh 2>/dev/null || true
+    - bash scripts/ci/truncate.sh
   rules:
     - if: $CI_COMMIT_BRANCH == "main"
       when: manual

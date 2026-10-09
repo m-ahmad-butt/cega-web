@@ -1,13 +1,9 @@
-# CI overrides for the shell runner: lighter Redis, unique container names,
-# and no host ports (avoids clashing with /opt/web-comp production).
-# `!reset []` is required — plain `ports: []` does NOT clear base compose ports.
 services:
   mongodb:
     image: mongo:7
     container_name: ci-mongodb
     ports: !reset []
     healthcheck:
-      # mongosh exit codes are flaky on mongo:latest; force 0/1 from ping.ok
       test: ["CMD-SHELL", "mongosh --quiet --eval \"quit(db.runCommand({ ping: 1 }).ok ? 0 : 2)\" || exit 1"]
       interval: 5s
       timeout: 10s
