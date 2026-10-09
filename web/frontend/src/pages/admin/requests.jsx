@@ -49,9 +49,14 @@ const AdminRequests = () => {
 
   const handleAction = async () => {
     if (!actionModal) return;
+    const requestId = actionModal.request.id || actionModal.request._id;
+    if (!requestId) {
+      warn('Invalid request id');
+      return;
+    }
     setSubmitting(true);
     try {
-      await adminAPI.handleRequest(actionModal.request._id, {
+      await adminAPI.handleRequest(requestId, {
         status: actionModal.action,
         remark,
       });
@@ -102,7 +107,7 @@ const AdminRequests = () => {
                 </tr></thead>
                 <tbody>
                   {requests.map((r) => (
-                    <tr key={r._id} className="hover:bg-notion-surface/50 transition-colors">
+                    <tr key={r.id || r._id} className="hover:bg-notion-surface/50 transition-colors">
                       <td className="n-td font-medium">{r.student?.fullName || '—'}</td>
                       <td className="n-td">{r.student?.registrationNumber || '—'}</td>
                       <td className="n-td"><span className="n-tag bg-notion-surface text-notion-text">{r.type?.replace('_', ' ')}</span></td>
@@ -125,7 +130,7 @@ const AdminRequests = () => {
 
             <div className="flex flex-col gap-3 md:hidden">
               {requests.map((r) => (
-                <div key={r._id} className="n-card p-4">
+                <div key={r.id || r._id} className="n-card p-4">
                   <div className="mb-1 flex items-center justify-between">
                     <span className="font-semibold text-sm">{r.student?.fullName}</span>
                     <span className={`n-tag ${statusColors[r.status] || ''}`}>{r.status}</span>

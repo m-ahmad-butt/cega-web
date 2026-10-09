@@ -509,11 +509,20 @@ const handleRequest = async (req, res) => {
     if (!status || !['APPROVED', 'REJECTED'].includes(status)) {
       return res.status(400).json({ message: 'status must be APPROVED or REJECTED' });
     }
+    if (!req.params.id || req.params.id === 'undefined') {
+      return res.status(400).json({ message: 'Valid request id is required' });
+    }
 
     const request = await ChangeRequest.findById(req.params.id).populate('student');
     if (!request) return res.status(404).json({ message: 'Request not found' });
     if (request.status !== 'PENDING') {
       return res.status(400).json({ message: 'Request has already been processed' });
+    }
+
+    const student = request.student;
+    const studentId = student?._id || student;
+    if (!studentId) {
+      return res.status(400).json({ message: 'Request has no linked student' });
     }
 
     request.status = status;
@@ -522,30 +531,35 @@ const handleRequest = async (req, res) => {
     if (status === 'APPROVED') {
       request.used = false;
       if (request.type === 'CHANGE_BRANCH') {
-        await User.findByIdAndUpdate(request.student._id, { branchLocked: false, selectedBranch: null });
+        await User.findByIdAndUpdate(studentId, { branchLocked: false, selectedBranch: null });
       } else if (request.type === 'CHANGE_DATESHEET') {
-        await User.findByIdAndUpdate(request.student._id, { dateSheetSaved: false });
-        await DateSheetSelection.deleteMany({ student: request.student._id });
+        await User.findByIdAndUpdate(studentId, { dateSheetSaved: false });
+        await DateSheetSelection.deleteMany({ student: studentId });
       }
     }
 
     await request.save();
 
-    try {
-      await emailService.sendRequestStatus(
-        request.student.email,
-        request.student.fullName,
-        request.type,
-        status,
-        remark
-      );
-    } catch (err) {
-      console.error('[Email] Request status email failed:', err.message);
+    if (student?.email) {
+      try {
+        await emailService.sendRequestStatus(
+          student.email,
+          student.fullName,
+          request.type,
+          status,
+          remark
+        );
+      } catch (err) {
+        console.error('[Email] Request status email failed:', err.message);
+      }
     }
 
-    res.status(200).json({ message: `Request ${status.toLowerCase()}`, data: formatDoc(request.toObject()) });
+    res.status(200).json({ message: `Request ${status.toLowerCase()}`, data: formatDoc(request) });
   } catch (error) {
     console.error('handleRequest error:', error);
+    if (error.name === 'CastError') {
+      return res.status(400).json({ message: 'Invalid request id' });
+    }
     res.status(500).json({ message: 'Server error' });
   }
 };
