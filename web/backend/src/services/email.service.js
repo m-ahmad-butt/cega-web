@@ -23,25 +23,17 @@ class EmailService {
         <meta name="viewport" content="width=device-width, initial-scale=1.0">
         <title>${title}</title>
       </head>
-      <body style="margin: 0; padding: 0; font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; background-color: #f8f9fa;">
-        <div style="max-width: 600px; margin: 0 auto; background-color: #ffffff; border-radius: 8px; overflow: hidden; box-shadow: 0 2px 10px rgba(0,0,0,0.1);">
-          <!-- Header -->
-          <div style="background-color: #000000; color: #ffffff; padding: 30px; text-align: center;">
-            <h1 style="margin: 0; font-size: 24px; font-weight: bold; letter-spacing: 2px;">ExamSlot</h1>
-            <p style="margin: 5px 0 0 0; font-size: 14px; opacity: 0.8;">Self-Service Exam Date Sheet</p>
+      <body style="margin:0;padding:24px;background:#f7f7f5;font-family:Georgia,'Times New Roman',serif;color:#37352f;">
+        <div style="max-width:640px;margin:0 auto;background:#ffffff;border:1px solid #e9e9e7;">
+          <div style="background:#37352f;color:#ffffff;padding:22px 28px;">
+            <p style="margin:0;font-family:Arial,Helvetica,sans-serif;font-size:11px;letter-spacing:1.4px;">VIRTUAL UNIVERSITY</p>
+            <p style="margin:6px 0 0;font-size:20px;">ExamSlot</p>
           </div>
-          
-          <!-- Content -->
-          <div style="padding: 40px 30px;">
+          <div style="padding:28px;font-family:Arial,Helvetica,sans-serif;font-size:14px;line-height:1.6;color:#37352f;">
             ${content}
           </div>
-          
-          <!-- Footer -->
-          <div style="background-color: #f8f9fa; padding: 20px 30px; text-align: center; border-top: 1px solid #e9ecef;">
-            <p style="margin: 0; font-size: 12px; color: #6c757d;">
-              This is an automated message from ExamSlot.<br>
-              Please do not reply to this email.
-            </p>
+          <div style="padding:16px 28px;border-top:1px solid #e9e9e7;font-family:Arial,Helvetica,sans-serif;font-size:12px;color:#787774;">
+            Examination Office. This message was generated automatically. Please do not reply.
           </div>
         </div>
       </body>
@@ -224,6 +216,54 @@ class EmailService {
       to: email,
       subject: title,
       html: this.getEmailTemplate(content, title),
+    });
+  }
+
+  async sendDateSheet(email, name, pdfBuffer, rows) {
+    const escape = (value) => String(value ?? '')
+      .replace(/&/g, '&amp;')
+      .replace(/</g, '&lt;')
+      .replace(/>/g, '&gt;');
+    const bodyRows = (rows || []).map((row) => `
+      <tr>
+        <td style="padding:8px;border-bottom:1px solid #e9e9e7;">${escape(row.number)}</td>
+        <td style="padding:8px;border-bottom:1px solid #e9e9e7;">${escape(row.code)}</td>
+        <td style="padding:8px;border-bottom:1px solid #e9e9e7;">${escape(row.title)}</td>
+        <td style="padding:8px;border-bottom:1px solid #e9e9e7;">${escape(row.level)}</td>
+        <td style="padding:8px;border-bottom:1px solid #e9e9e7;">${escape(row.date)}</td>
+        <td style="padding:8px;border-bottom:1px solid #e9e9e7;">${escape(row.time)}</td>
+        <td style="padding:8px;border-bottom:1px solid #e9e9e7;">${escape(row.gap)}</td>
+      </tr>
+    `).join('');
+    const content = `
+      <p style="margin:0 0 12px;">Dear ${escape(name || 'Student')},</p>
+      <p style="margin:0 0 16px;">Your examination date sheet is attached to this message. The same document can be downloaded from your student account.</p>
+      <p style="margin:0 0 16px;">Suggested spacing is 1 day for an easy paper, 3 days for a medium paper, and 7 days for a hard paper.</p>
+      <table style="width:100%;border-collapse:collapse;font-size:12px;">
+        <thead>
+          <tr style="background:#37352f;color:#ffffff;">
+            <th style="padding:8px;text-align:left;">No.</th>
+            <th style="padding:8px;text-align:left;">Code</th>
+            <th style="padding:8px;text-align:left;">Course</th>
+            <th style="padding:8px;text-align:left;">Level</th>
+            <th style="padding:8px;text-align:left;">Date</th>
+            <th style="padding:8px;text-align:left;">Time</th>
+            <th style="padding:8px;text-align:left;">Gap</th>
+          </tr>
+        </thead>
+        <tbody>${bodyRows}</tbody>
+      </table>
+    `;
+    return this.transporter.sendMail({
+      from: `"ExamSlot" <${process.env.EMAIL_USER}>`,
+      to: email,
+      subject: 'Examination date sheet',
+      html: this.getEmailTemplate(content, 'Examination date sheet'),
+      attachments: [{
+        filename: 'Examination-Date-Sheet.pdf',
+        content: pdfBuffer,
+        contentType: 'application/pdf',
+      }],
     });
   }
 

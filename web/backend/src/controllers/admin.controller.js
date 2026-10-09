@@ -105,8 +105,9 @@ const deleteBranch = async (req, res) => {
 
 const listCourses = async (req, res) => {
   try {
-    const { page, pageSize, search } = req.query;
+    const { page, pageSize, search, department } = req.query;
     const filter = {};
+    if (department) filter.department = department;
     if (search) {
       const regex = new RegExp(search, 'i');
       filter.$or = [{ courseCode: regex }, { title: regex }, { department: regex }];
@@ -121,11 +122,15 @@ const listCourses = async (req, res) => {
 
 const createCourse = async (req, res) => {
   try {
-    const { courseCode, title, creditHours, department, status } = req.body;
+    const { courseCode, title, creditHours, department, difficulty, status } = req.body;
     if (!courseCode || !title || creditHours == null) {
       return res.status(400).json({ message: 'courseCode, title, and creditHours are required' });
     }
-    const course = await Course.create({ courseCode, title, creditHours, department, status });
+    const level = ['easy', 'medium', 'hard'].includes(difficulty) ? difficulty : 'medium';
+    const courseStatus = String(status || 'active').toLowerCase() === 'inactive' ? 'inactive' : 'active';
+    const course = await Course.create({
+      courseCode, title, creditHours, department, difficulty: level, status: courseStatus,
+    });
     res.status(201).json({ message: 'Course created', data: formatDoc(course) });
   } catch (error) {
     if (error.code === 11000) return res.status(400).json({ message: 'Course code already exists' });

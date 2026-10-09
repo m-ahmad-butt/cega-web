@@ -1,0 +1,155 @@
+const PDFDocument = require('pdfkit');
+
+const MONTHS = [
+  'January', 'February', 'March', 'April', 'May', 'June',
+  'July', 'August', 'September', 'October', 'November', 'December',
+];
+const DAYS = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'];
+
+const levelOf = (value) => {
+  if (value === 'easy') return 'Easy';
+  if (value === 'hard') return 'Hard';
+  return 'Medium';
+};
+
+const formatDate = (value) => {
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) return 'Not set';
+  return `${date.getUTCDate()} ${MONTHS[date.getUTCMonth()]} ${date.getUTCFullYear()}`;
+};
+
+const dayName = (value) => {
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) return 'Not set';
+  return DAYS[date.getUTCDay()];
+};
+
+const gapDays = (current, previous) => {
+  const a = new Date(current);
+  const b = new Date(previous);
+  const utc = (date) => Date.UTC(date.getUTCFullYear(), date.getUTCMonth(), date.getUTCDate());
+  return Math.round((utc(a) - utc(b)) / 86400000);
+};
+
+const rowsFromSelections = (selections) => {
+  const sorted = [...(selections || [])].filter((row) => row.examSlot).sort(
+    (a, b) => new Date(a.examSlot.date) - new Date(b.examSlot.date)
+  );
+  let previous = null;
+  return sorted.map((row, index) => {
+    const date = row.examSlot.date;
+    const gap = previous ? gapDays(date, previous) : null;
+    previous = date;
+    return {
+      number: index + 1,
+      code: row.course?.courseCode || '',
+      title: row.course?.title || '',
+      department: row.course?.department || '',
+      level: levelOf(row.course?.difficulty),
+      date: formatDate(date),
+      day: dayName(date),
+      time: `${row.examSlot.startTime} to ${row.examSlot.endTime || ''}`.trim(),
+      gap: gap == null ? 'First paper' : String(gap),
+    };
+  });
+};
+
+const buildView = (user, selections) => ({
+  student: {
+    fullName: user.fullName || '',
+    email: user.email || '',
+    registrationNumber: user.registrationNumber || 'Not assigned',
+    program: user.program || 'Not assigned',
+    branchName: user.selectedBranch?.name || 'Not assigned',
+  },
+  rows: rowsFromSelections(selections),
+});
+
+const renderDateSheetPdf = (view) => new Promise((resolve, reject) => {
+  const doc = new PDFDocument({ size: 'A4', margin: 48 });
+  const chunks = [];
+  doc.on('data', (chunk) => chunks.push(chunk));
+  doc.on('end', () => resolve(Buffer.concat(chunks)));
+  doc.on('error', reject);
+
+  const ink = '#37352f';
+  const muted = '#787774';
+  const line = '#e9e9e7';
+  const left = 48;
+  const width = doc.page.width - 96;
+
+  doc.rect(0, 0, doc.page.width, 78).fill(ink);
+  doc.fillColor('#ffffff').font('Helvetica').fontSize(10).text('VIRTUAL UNIVERSITY', left, 22);
+  doc.font('Helvetica-Bold').fontSize(18).text('Examination Date Sheet', left, 40);
+
+  doc.fillColor(ink).font('Helvetica').fontSize(10);
+  const details = [
+    ['Name', view.student.fullName],
+    ['Registration No.', view.student.registrationNumber],
+    ['Program', view.student.program],
+    ['Exam Centre', view.student.branchName],
+  ];
+  let y = 98;
+  details.forEach(([label, value]) => {
+    doc.font('Helvetica').fillColor(muted).text(label, left, y, { width: 110 });
+    doc.font('Helvetica-Bold').fillColor(ink).text(value || 'Not assigned', left + 118, y, { width: width - 118 });
+    y += 16;
+  });
+
+  y += 10;
+  doc.font('Helvetica').fontSize(9).fillColor(muted).text(
+    'Suggested spacing is 1 day for an easy paper, 3 days for a medium paper, and 7 days for a hard paper.',
+    left,
+    y,
+    { width }
+  );
+  y += 32;
+
+  const columns = [
+    { label: 'No.', width: 28, key: 'number' },
+    { label: 'Code', width: 52, key: 'code' },
+    { label: 'Course', width: 132, key: 'title' },
+    { label: 'Level', width: 52, key: 'level' },
+    { label: 'Date', width: 92, key: 'date' },
+    { label: 'Time', width: 78, key: 'time' },
+    { label: 'Gap', width: 65, key: 'gap' },
+  ];
+
+  const drawHeader = (top) => {
+    doc.rect(left, top, width, 20).fill(ink);
+    let x = left + 6;
+    doc.fillColor('#ffffff').font('Helvetica-Bold').fontSize(8);
+    columns.forEach((column) => {
+      doc.text(column.label, x, top + 6, { width: column.width - 8, lineBreak: false });
+      x += column.width;
+    });
+  };
+
+  drawHeader(y);
+  y += 20;
+
+  view.rows.forEach((row, index) => {
+    const rowHeight = 22;
+    if (y + rowHeight > doc.page.height - 72) {
+      doc.addPage();
+      y = 48;
+      drawHeader(y);
+      y += 20;
+    }
+    if (index % 2 === 0) doc.rect(left, y, width, rowHeight).fill('#f7f7f5');
+    doc.strokeColor(line).moveTo(left, y + rowHeight).lineTo(left + width, y + rowHeight).stroke();
+    let x = left + 6;
+    doc.fillColor(ink).font('Helvetica').fontSize(8);
+    columns.forEach((column) => {
+      doc.text(String(row[column.key] ?? ''), x, y + 7, { width: column.width - 8, lineBreak: false, ellipsis: true });
+      x += column.width;
+    });
+    y += rowHeight;
+  });
+
+  const footer = 'This document was generated by ExamSlot. Submit a change request in the student portal if a correction is required.';
+  doc.font('Helvetica').fontSize(8).fillColor(muted).text(footer, left, doc.page.height - 56, { width, align: 'left' });
+  doc.end();
+});
+
+module.exports = { buildView, renderDateSheetPdf, rowsFromSelections };

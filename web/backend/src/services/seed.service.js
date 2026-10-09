@@ -42,14 +42,32 @@ const seedBranches = async () => {
 
 const seedCourses = async () => {
   const courses = [
-    { courseCode: 'CS101', title: 'Programming Fundamentals', creditHours: 3, department: 'Computer Science' },
-    { courseCode: 'CS201', title: 'Data Structures', creditHours: 3, department: 'Computer Science' },
-    { courseCode: 'CS301', title: 'Database Systems', creditHours: 3, department: 'Computer Science' },
-    { courseCode: 'CS401', title: 'Software Engineering', creditHours: 3, department: 'Computer Science' },
-    { courseCode: 'MT101', title: 'Calculus', creditHours: 3, department: 'Mathematics' },
-    { courseCode: 'MT201', title: 'Linear Algebra', creditHours: 3, department: 'Mathematics' },
-    { courseCode: 'EE101', title: 'Digital Logic', creditHours: 4, department: 'Electrical Engineering' },
-    { courseCode: 'CS501', title: 'Computer Networks', creditHours: 3, department: 'Computer Science' },
+    { courseCode: 'CS101', title: 'Programming Fundamentals', creditHours: 3, department: 'Computer Science', difficulty: 'easy' },
+    { courseCode: 'CS201', title: 'Data Structures', creditHours: 3, department: 'Computer Science', difficulty: 'medium' },
+    { courseCode: 'CS301', title: 'Database Systems', creditHours: 3, department: 'Computer Science', difficulty: 'hard' },
+    { courseCode: 'CS401', title: 'Software Engineering', creditHours: 3, department: 'Computer Science', difficulty: 'hard' },
+    { courseCode: 'CS501', title: 'Computer Networks', creditHours: 3, department: 'Computer Science', difficulty: 'medium' },
+    { courseCode: 'CS601', title: 'Operating Systems', creditHours: 3, department: 'Computer Science', difficulty: 'hard' },
+    { courseCode: 'SE101', title: 'Introduction to Software Engineering', creditHours: 3, department: 'Software Engineering', difficulty: 'easy' },
+    { courseCode: 'SE201', title: 'Object Oriented Programming', creditHours: 3, department: 'Software Engineering', difficulty: 'medium' },
+    { courseCode: 'SE301', title: 'Requirements Engineering', creditHours: 3, department: 'Software Engineering', difficulty: 'hard' },
+    { courseCode: 'SE401', title: 'Software Quality Assurance', creditHours: 3, department: 'Software Engineering', difficulty: 'medium' },
+    { courseCode: 'AI101', title: 'Introduction to Artificial Intelligence', creditHours: 3, department: 'Artificial Intelligence', difficulty: 'easy' },
+    { courseCode: 'AI201', title: 'Machine Learning', creditHours: 3, department: 'Artificial Intelligence', difficulty: 'hard' },
+    { courseCode: 'AI301', title: 'Deep Learning', creditHours: 3, department: 'Artificial Intelligence', difficulty: 'hard' },
+    { courseCode: 'AI401', title: 'Natural Language Processing', creditHours: 3, department: 'Artificial Intelligence', difficulty: 'medium' },
+    { courseCode: 'DS101', title: 'Introduction to Data Science', creditHours: 3, department: 'Data Science', difficulty: 'easy' },
+    { courseCode: 'DS201', title: 'Statistics for Data Science', creditHours: 3, department: 'Data Science', difficulty: 'medium' },
+    { courseCode: 'DS301', title: 'Data Mining', creditHours: 3, department: 'Data Science', difficulty: 'hard' },
+    { courseCode: 'DS401', title: 'Big Data Analytics', creditHours: 3, department: 'Data Science', difficulty: 'medium' },
+    { courseCode: 'BBA101', title: 'Principles of Management', creditHours: 3, department: 'Business Administration', difficulty: 'easy' },
+    { courseCode: 'BBA201', title: 'Financial Accounting', creditHours: 3, department: 'Business Administration', difficulty: 'medium' },
+    { courseCode: 'BBA301', title: 'Business Finance', creditHours: 3, department: 'Business Administration', difficulty: 'hard' },
+    { courseCode: 'BBA401', title: 'Marketing Management', creditHours: 3, department: 'Business Administration', difficulty: 'medium' },
+    { courseCode: 'MT101', title: 'Calculus', creditHours: 3, department: 'Mathematics', difficulty: 'easy' },
+    { courseCode: 'MT201', title: 'Linear Algebra', creditHours: 3, department: 'Mathematics', difficulty: 'medium' },
+    { courseCode: 'MT301', title: 'Probability', creditHours: 3, department: 'Mathematics', difficulty: 'hard' },
+    { courseCode: 'EE101', title: 'Digital Logic', creditHours: 4, department: 'Electrical Engineering', difficulty: 'medium' },
   ];
 
   for (const c of courses) {
@@ -146,34 +164,56 @@ const seedAssignmentsAndSlots = async () => {
   }
   console.log('[SEED] Course assignments seeded');
 
-  // Exam slots: 2-3 per course, future dates
-  const slotTemplates = [
-    { dayOffset: 10, startTime: '09:00', endTime: '12:00' },
-    { dayOffset: 10, startTime: '14:00', endTime: '17:00' },
-    { dayOffset: 17, startTime: '09:00', endTime: '12:00' },
-  ];
+  // Muhammad Ahmad's papers: easy courses sit on nearby dates, hard courses are a week apart.
+  const explicitSlots = {
+    CS101: ['2026-11-02', '2026-11-03', '2026-11-04'],
+    MT101: ['2026-11-03', '2026-11-04', '2026-11-05'],
+    CS201: ['2026-11-06', '2026-11-10', '2026-11-13'],
+    CS301: ['2026-11-16', '2026-11-23', '2026-11-30'],
+    CS401: ['2026-11-24', '2026-12-01', '2026-12-08'],
+  };
+  const explicitCodes = new Set(Object.keys(explicitSlots));
+  const noon = (iso) => {
+    const [year, month, day] = iso.split('-').map(Number);
+    return new Date(Date.UTC(year, month - 1, day, 12, 0, 0));
+  };
 
-  const baseDate = new Date('2026-10-15');
+  const slotTemplates = [
+    { dayOffset: 14, startTime: '09:00', endTime: '12:00' },
+    { dayOffset: 21, startTime: '09:00', endTime: '12:00' },
+  ];
+  const baseDate = new Date(Date.UTC(2026, 10, 2, 12, 0, 0));
 
   for (let i = 0; i < courses.length; i++) {
     const course = courses[i];
-    const templates = i % 2 === 0 ? slotTemplates : slotTemplates.slice(0, 2);
-
-    for (const tmpl of templates) {
+    if (explicitCodes.has(course.courseCode)) continue;
+    for (const tmpl of slotTemplates) {
       const date = new Date(baseDate);
-      date.setDate(date.getDate() + tmpl.dayOffset + i);
-
+      date.setUTCDate(date.getUTCDate() + tmpl.dayOffset + i);
       await ExamSlot.findOneAndUpdate(
         { course: course._id, date, startTime: tmpl.startTime },
         {
-          course: course._id,
-          date,
-          startTime: tmpl.startTime,
-          endTime: tmpl.endTime,
-          capacity: 1,
-          booked: 0,
+          $set: { endTime: tmpl.endTime, capacity: 40 },
+          $setOnInsert: { course: course._id, date, startTime: tmpl.startTime, booked: 0 },
         },
-        { upsert: true, new: true, setDefaultsOnInsert: true }
+        { upsert: true, setDefaultsOnInsert: true }
+      );
+    }
+  }
+
+  for (const [code, dates] of Object.entries(explicitSlots)) {
+    const courseId = courseMap[code];
+    if (!courseId) continue;
+    await ExamSlot.deleteMany({ course: courseId, booked: { $lte: 0 } });
+    for (const iso of dates) {
+      const date = noon(iso);
+      await ExamSlot.findOneAndUpdate(
+        { course: courseId, date, startTime: '09:00' },
+        {
+          $set: { endTime: '12:00', capacity: 40 },
+          $setOnInsert: { course: courseId, date, startTime: '09:00', booked: 0 },
+        },
+        { upsert: true, setDefaultsOnInsert: true }
       );
     }
   }

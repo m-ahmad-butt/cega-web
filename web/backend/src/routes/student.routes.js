@@ -16,6 +16,7 @@ router.post('/select-branch', requireStudent, studentController.selectBranch);
 router.get('/assigned-courses', requireStudent, studentController.getAssignedCourses);
 router.post('/save-datesheet', requireStudent, studentController.saveDateSheet);
 router.get('/datesheet', requireStudent, studentController.getDateSheet);
+router.get('/datesheet/pdf', requireStudent, studentController.downloadDateSheet);
 router.post('/requests', requireStudent, studentController.createRequest);
 router.get('/requests', requireStudent, studentController.getMyRequests);
 

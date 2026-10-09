@@ -1,6 +1,3 @@
-# PRODUCTION stack — no hot reload, built nginx frontend
-# Usage: docker compose -f docker-compose.prod.yml --env-file frontend/.env --env-file backend/.env up -d --build
-
 services:
   mongodb:
     image: mongo:7
@@ -107,7 +104,6 @@ services:
     image: hackathon-backend:prod
     container_name: hackathon-backend
     ports:
-      # Localhost only — host nginx (init TLS) proxies public 443 → here
       - "127.0.0.1:3001:3001"
     env_file:
       - ./backend/.env
@@ -136,7 +132,6 @@ services:
     image: hackathon-frontend:prod
     container_name: hackathon-frontend
     ports:
-      # Localhost only — host nginx owns public :80/:443
       - "127.0.0.1:8080:80"
     networks:
       - hackathon-network

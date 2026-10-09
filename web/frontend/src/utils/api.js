@@ -117,6 +117,7 @@ export const studentAPI = {
   getAssignedCourses: () => api.get('/api/student/assigned-courses'),
   saveDateSheet: (data) => api.post('/api/student/save-datesheet', data),
   getDateSheet: () => api.get('/api/student/datesheet'),
+  downloadDateSheet: () => api.get('/api/student/datesheet/pdf', { responseType: 'blob' }),
   createRequest: (data) => api.post('/api/student/requests', data),
   getMyRequests: () => api.get('/api/student/requests'),
   agentChat: (data) => api.post('/api/student/agent/chat', data),

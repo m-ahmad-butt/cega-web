@@ -7,7 +7,20 @@ import { useGuide, useWarn } from '../../components/GuideModal';
 import { Plus, Pencil, Trash2, Search, X, Loader2, Upload } from 'lucide-react';
 import ImportSheet from '../../components/ImportSheet';
 
-const empty = { courseCode: '', title: '', creditHours: 3, department: '', status: 'ACTIVE' };
+const DEPARTMENTS = [
+  'Computer Science',
+  'Software Engineering',
+  'Artificial Intelligence',
+  'Data Science',
+  'Business Administration',
+  'Mathematics',
+  'Electrical Engineering',
+];
+
+const empty = { courseCode: '', title: '', creditHours: 3, department: 'Computer Science', difficulty: 'medium', status: 'active' };
+const isActive = (value) => String(value || '').toLowerCase() !== 'inactive';
+const statusLabel = (value) => (isActive(value) ? 'Active' : 'Inactive');
+const levelLabel = (value) => (value === 'easy' ? 'Easy' : value === 'hard' ? 'Hard' : 'Medium');
 
 const AdminCourses = () => {
   const { say } = useGuide();
@@ -16,6 +29,7 @@ const AdminCourses = () => {
   const [page, setPage] = useState(1);
   const [totalPages, setTotalPages] = useState(1);
   const [search, setSearch] = useState('');
+  const [department, setDepartment] = useState('');
   const [loading, setLoading] = useState(true);
   const [modalOpen, setModalOpen] = useState(false);
   const [form, setForm] = useState(empty);
@@ -27,7 +41,7 @@ const AdminCourses = () => {
   const load = useCallback(async () => {
     setLoading(true);
     try {
-      const { data } = await adminAPI.getCourses({ page, search, limit: 10 });
+      const { data } = await adminAPI.getCourses({ page, pageSize: 10, search, department });
       setCourses(data.courses || data.data || []);
       setTotalPages(data.totalPages || 1);
     } catch {
@@ -35,12 +49,23 @@ const AdminCourses = () => {
     } finally {
       setLoading(false);
     }
-  }, [page, search]);
+  }, [page, search, department]);
 
   useEffect(() => { load(); }, [load]);
 
   const openAdd = () => { setForm(empty); setEditId(null); setModalOpen(true); };
-  const openEdit = (c) => { setForm({ courseCode: c.courseCode, title: c.title, creditHours: c.creditHours || 3, department: c.department || '', status: c.status || 'ACTIVE' }); setEditId(c.id || c._id); setModalOpen(true); };
+  const openEdit = (c) => {
+    setForm({
+      courseCode: c.courseCode,
+      title: c.title,
+      creditHours: c.creditHours || 3,
+      department: c.department || 'Computer Science',
+      difficulty: c.difficulty || 'medium',
+      status: isActive(c.status) ? 'active' : 'inactive',
+    });
+    setEditId(c.id || c._id);
+    setModalOpen(true);
+  };
   const closeModal = () => { setModalOpen(false); setForm(empty); setEditId(null); };
 
   const handleSave = async (e) => {
@@ -89,9 +114,19 @@ const AdminCourses = () => {
           </div>
         </div>
 
-        <div className="relative mb-4 max-w-sm">
-          <Search size={16} className="absolute left-3 top-1/2 -translate-y-1/2 text-notion-muted" />
-          <input value={search} onChange={(e) => { setSearch(e.target.value); setPage(1); }} placeholder="Search courses…" className="n-input pl-9" />
+        <div className="mb-4 flex flex-col gap-2 sm:flex-row">
+          <div className="relative max-w-sm flex-1">
+            <Search size={16} className="absolute left-3 top-1/2 -translate-y-1/2 text-notion-muted" />
+            <input value={search} onChange={(e) => { setSearch(e.target.value); setPage(1); }} placeholder="Search courses" className="n-input pl-9" />
+          </div>
+          <select
+            value={department}
+            onChange={(e) => { setDepartment(e.target.value); setPage(1); }}
+            className="n-input sm:max-w-xs"
+          >
+            <option value="">All departments</option>
+            {DEPARTMENTS.map((name) => <option key={name} value={name}>{name}</option>)}
+          </select>
         </div>
 
         {loading ? (
@@ -104,7 +139,7 @@ const AdminCourses = () => {
               <table className="w-full">
                 <thead><tr className="bg-notion-surface">
                   <th className="n-th">Code</th><th className="n-th">Title</th><th className="n-th">Credit Hrs</th>
-                  <th className="n-th">Department</th><th className="n-th">Status</th><th className="n-th text-right">Actions</th>
+                  <th className="n-th">Department</th><th className="n-th">Level</th><th className="n-th">Status</th><th className="n-th text-right">Actions</th>
                 </tr></thead>
                 <tbody>
                   {courses.map((c) => (
@@ -113,8 +148,9 @@ const AdminCourses = () => {
                       <td className="n-td">{c.title}</td>
                       <td className="n-td">{c.creditHours}</td>
                       <td className="n-td">{c.department}</td>
+                      <td className="n-td">{levelLabel(c.difficulty)}</td>
                       <td className="n-td">
-                        <span className={`n-tag ${c.status === 'ACTIVE' ? 'bg-notion-green-soft text-notion-green' : 'bg-notion-red-soft text-notion-red'}`}>{c.status}</span>
+                        <span className={`n-tag ${isActive(c.status) ? 'bg-notion-green-soft text-notion-green' : 'bg-notion-red-soft text-notion-red'}`}>{statusLabel(c.status)}</span>
                       </td>
                       <td className="n-td text-right">
                         <button onClick={() => openEdit(c)} className="n-btn-ghost p-1.5"><Pencil size={14} /></button>
@@ -131,10 +167,10 @@ const AdminCourses = () => {
                 <div key={c.id || c._id} className="n-card p-4">
                   <div className="mb-2 flex items-center justify-between">
                     <span className="font-semibold">{c.courseCode}</span>
-                    <span className={`n-tag ${c.status === 'ACTIVE' ? 'bg-notion-green-soft text-notion-green' : 'bg-notion-red-soft text-notion-red'}`}>{c.status}</span>
+                    <span className={`n-tag ${isActive(c.status) ? 'bg-notion-green-soft text-notion-green' : 'bg-notion-red-soft text-notion-red'}`}>{statusLabel(c.status)}</span>
                   </div>
                   <p className="text-sm">{c.title}</p>
-                  <p className="text-xs text-notion-muted">{c.creditHours} credit hrs · {c.department}</p>
+                  <p className="text-xs text-notion-muted">{c.creditHours} credit hours, {c.department}, {levelLabel(c.difficulty)}</p>
                   <div className="mt-3 flex gap-2">
                     <button onClick={() => openEdit(c)} className="n-btn-secondary py-1 px-2 text-xs"><Pencil size={12} /> Edit</button>
                     <button onClick={() => setDeleteTarget(c)} className="n-btn-danger py-1 px-2 text-xs"><Trash2 size={12} /> Delete</button>
@@ -159,12 +195,25 @@ const AdminCourses = () => {
                 <div><label className="n-label">Course Code *</label><input value={form.courseCode} onChange={(e) => set('courseCode', e.target.value)} className="n-input" /></div>
                 <div><label className="n-label">Title *</label><input value={form.title} onChange={(e) => set('title', e.target.value)} className="n-input" /></div>
                 <div><label className="n-label">Credit Hours</label><input type="number" min="1" max="6" value={form.creditHours} onChange={(e) => set('creditHours', Number(e.target.value))} className="n-input" /></div>
-                <div><label className="n-label">Department</label><input value={form.department} onChange={(e) => set('department', e.target.value)} className="n-input" /></div>
+                <div>
+                  <label className="n-label">Department</label>
+                  <select value={form.department} onChange={(e) => set('department', e.target.value)} className="n-input">
+                    {DEPARTMENTS.map((name) => <option key={name} value={name}>{name}</option>)}
+                  </select>
+                </div>
+                <div>
+                  <label className="n-label">Level</label>
+                  <select value={form.difficulty} onChange={(e) => set('difficulty', e.target.value)} className="n-input">
+                    <option value="easy">Easy</option>
+                    <option value="medium">Medium</option>
+                    <option value="hard">Hard</option>
+                  </select>
+                </div>
               </div>
               <div>
                 <label className="n-label">Status</label>
                 <select value={form.status} onChange={(e) => set('status', e.target.value)} className="n-input">
-                  <option value="ACTIVE">Active</option><option value="INACTIVE">Inactive</option>
+                  <option value="active">Active</option><option value="inactive">Inactive</option>
                 </select>
               </div>
               <div className="flex justify-end gap-2 pt-2">

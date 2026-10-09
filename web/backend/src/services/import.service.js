@@ -29,6 +29,12 @@ const parseSheet = (buffer) => {
   return XLSX.utils.sheet_to_json(sheet, { defval: '', raw: false });
 };
 
+const difficultyOf = (value) => {
+  const v = String(value || '').trim().toLowerCase();
+  if (v === 'easy' || v === 'medium' || v === 'hard') return v;
+  return 'medium';
+};
+
 const statusOf = (value, fallback = 'active') => {
   const v = String(value || '').trim().toLowerCase();
   if (v === 'inactive' || v === 'disabled') return 'inactive';
@@ -59,6 +65,7 @@ const previewRow = (kind, raw) => {
       title: pick(raw, ['title', 'name', 'course']),
       creditHours: credits || '3',
       department: pick(raw, ['department', 'discipline']),
+      difficulty: difficultyOf(pick(raw, ['difficulty', 'level'])),
       status: statusOf(pick(raw, ['status'])),
     };
     const issues = [];
@@ -206,6 +213,7 @@ const commitCourses = async (rows) => {
           title: row.title,
           creditHours: Number(row.creditHours),
           department: row.department,
+          difficulty: row.difficulty || 'medium',
           status: row.status,
         },
         { upsert: true, new: true, setDefaultsOnInsert: true }

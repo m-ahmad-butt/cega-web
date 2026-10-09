@@ -5,7 +5,10 @@ import StudentNavbar from '../../components/StudentNavbar';
 import { studentAPI, unwrap } from '../../utils/api';
 import { useGuide, useWarn } from '../../components/GuideModal';
 import { useAgentPanel } from '../../components/AgentPanel';
-import { Loader2, CalendarDays, AlertTriangle, CheckCircle, HelpCircle, Bot } from 'lucide-react';
+import { Loader2, CalendarDays, AlertTriangle, CheckCircle, HelpCircle, Bot, Download } from 'lucide-react';
+
+const levelLabel = (value) => (value === 'easy' ? 'Easy' : value === 'hard' ? 'Hard' : 'Medium');
+const suggestedGap = { easy: 1, medium: 3, hard: 7 };
 
 const StudentDashboard = () => {
   const navigate = useNavigate();
@@ -32,22 +35,20 @@ const StudentDashboard = () => {
           return;
         }
 
-        if (!p.dateSheetSaved) {
-          const { data: courseData } = await studentAPI.getAssignedCourses();
-          const rows = unwrap(courseData);
-          const list = (Array.isArray(rows) ? rows : []).map((row) => {
-            const course = row.course || row;
-            return {
-              ...course,
-              _id: course.id || course._id,
-              slots: (row.slots || course.slots || []).map((s) => ({
-                ...s,
-                _id: s.id || s._id,
-              })),
-            };
-          });
-          setCourses(list);
-        }
+        const { data: courseData } = await studentAPI.getAssignedCourses();
+        const rows = unwrap(courseData);
+        const list = (Array.isArray(rows) ? rows : []).map((row) => {
+          const course = row.course || row;
+          return {
+            ...course,
+            _id: course.id || course._id,
+            slots: (row.slots || course.slots || []).map((s) => ({
+              ...s,
+              _id: s.id || s._id,
+            })),
+          };
+        });
+        setCourses(list);
       } catch (err) {
         warn('Failed to load profile');
       } finally {
@@ -100,8 +101,8 @@ const StudentDashboard = () => {
     const entries = Object.entries(selections).map(([courseId, slotId]) => ({ courseId, slotId }));
     setSaving(true);
     try {
-      await studentAPI.saveDateSheet({ selections: entries });
-      say({ title: 'Date Sheet Saved', body: 'Your exam schedule has been confirmed!', action: 'OK' });
+      const { data } = await studentAPI.saveDateSheet({ selections: entries });
+      say({ title: 'Date sheet saved', body: data.message || 'Your date sheet has been saved.', action: 'OK' });
       navigate('/student/datesheet');
     } catch (err) {
       warn(err.response?.data?.message || 'Failed to save');
@@ -110,7 +111,39 @@ const StudentDashboard = () => {
     }
   };
 
-  const fmtDate = (d) => d ? new Date(d).toLocaleDateString('en-PK', { weekday: 'short', month: 'short', day: 'numeric' }) : '—';
+  const fmtDate = (d) => d ? new Date(d).toLocaleDateString('en-PK', { weekday: 'short', month: 'short', day: 'numeric' }) : 'Not set';
+
+  const plan = useMemo(() => {
+    const picked = courses.map((course) => {
+      const id = course._id || course.courseId;
+      const slot = allSlotsById[selections[id]];
+      if (!slot) return null;
+      return { course, slot };
+    }).filter(Boolean).sort((a, b) => new Date(a.slot.date) - new Date(b.slot.date));
+
+    return picked.map((item, index) => {
+      const previous = picked[index - 1];
+      if (!previous) return { ...item, gap: null };
+      const current = new Date(item.slot.date);
+      const prior = new Date(previous.slot.date);
+      const utc = (date) => Date.UTC(date.getUTCFullYear(), date.getUTCMonth(), date.getUTCDate());
+      return { ...item, gap: Math.round((utc(current) - utc(prior)) / 86400000) };
+    });
+  }, [courses, selections, allSlotsById]);
+
+  const downloadCourses = () => {
+    const header = 'course code,title,department,level,credit hours';
+    const lines = courses.map((course) => [course.courseCode, course.title, course.department, levelLabel(course.difficulty), course.creditHours]
+      .map((value) => `"${String(value ?? '').replace(/"/g, '""')}"`)
+      .join(','));
+    const blob = new Blob([[header, ...lines].join('\n')], { type: 'text/csv;charset=utf-8' });
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement('a');
+    link.href = url;
+    link.download = 'registered-courses.csv';
+    link.click();
+    URL.revokeObjectURL(url);
+  };
 
   if (loading) return (
     <div className="n-page"><StudentNavbar />
@@ -151,12 +184,47 @@ const StudentDashboard = () => {
           </div>
         </div>
 
+        <div className="mb-8">
+          <div className="mb-3 flex flex-wrap items-center justify-between gap-2">
+            <h2 className="text-lg font-semibold">Registered courses</h2>
+            <button type="button" onClick={downloadCourses} disabled={!courses.length} className="n-btn-secondary">
+              <Download size={16} /> Download CSV
+            </button>
+          </div>
+          {courses.length === 0 ? (
+            <div className="n-card p-6 text-sm text-notion-muted">No courses are registered yet.</div>
+          ) : (
+            <div className="n-card overflow-hidden">
+              <table className="w-full">
+                <thead>
+                  <tr className="bg-notion-surface">
+                    <th className="n-th">Code</th>
+                    <th className="n-th">Title</th>
+                    <th className="n-th">Department</th>
+                    <th className="n-th">Level</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {courses.map((course) => (
+                    <tr key={course._id || course.courseCode}>
+                      <td className="n-td font-medium">{course.courseCode}</td>
+                      <td className="n-td">{course.title}</td>
+                      <td className="n-td">{course.department}</td>
+                      <td className="n-td">{levelLabel(course.difficulty)}</td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          )}
+        </div>
+
         {/* Date sheet status */}
         {profile.dateSheetSaved ? (
           <div className="n-card p-6 text-center">
             <CheckCircle size={40} className="mx-auto mb-3 text-notion-green" />
             <h2 className="text-lg font-semibold mb-1">Date Sheet Saved</h2>
-            <p className="text-sm text-notion-muted mb-4">Your exam schedule has been confirmed.</p>
+            <p className="text-sm text-notion-muted mb-4">Your exam schedule is confirmed. Open it to download the PDF.</p>
             <Link to="/student/datesheet" className="n-btn"><CalendarDays size={16} /> View Date Sheet</Link>
           </div>
         ) : (
@@ -193,6 +261,9 @@ const StudentDashboard = () => {
                           <div>
                             <span className="font-semibold">{course.courseCode}</span>
                             <span className="ml-2 text-notion-muted">{course.title}</span>
+                            <p className="mt-1 text-xs text-notion-muted">
+                              {levelLabel(course.difficulty)}. Suggested gap of {suggestedGap[course.difficulty] || 3} day{(suggestedGap[course.difficulty] || 3) === 1 ? '' : 's'}.
+                            </p>
                           </div>
                           {selections[cid] && !isConflict && (
                             <span className="n-chip"><CheckCircle size={12} /> Selected</span>
@@ -225,7 +296,7 @@ const StudentDashboard = () => {
                                 >
                                   <div className="font-medium">{fmtDate(slot.date)}</div>
                                   <div className={`text-xs ${isSelected ? 'text-white/80' : 'text-notion-muted'}`}>
-                                    {slot.startTime} – {slot.endTime}
+                                    {slot.startTime} to {slot.endTime}
                                   </div>
                                   <div className={`text-xs mt-1 ${isSelected ? 'text-white/70' : isFull ? 'text-notion-red' : 'text-notion-muted'}`}>
                                     {isFull ? 'Full' : `${remaining} seats left`}
@@ -239,6 +310,24 @@ const StudentDashboard = () => {
                     );
                   })}
                 </div>
+
+                {plan.length > 0 && (
+                  <div className="n-card mt-6 p-5">
+                    <h3 className="text-sm font-semibold">Selected spacing</h3>
+                    <p className="mt-1 text-xs text-notion-muted">Easy papers should sit closer together. Hard papers should have a longer gap.</p>
+                    <ul className="mt-3 space-y-2 text-sm">
+                      {plan.map((item) => (
+                        <li key={item.course._id || item.course.courseCode} className="flex flex-wrap justify-between gap-2 border-t border-notion-border pt-2 first:border-t-0 first:pt-0">
+                          <span>{item.course.courseCode} ({levelLabel(item.course.difficulty)})</span>
+                          <span className="text-notion-muted">
+                            {fmtDate(item.slot.date)}
+                            {item.gap == null ? '. First paper.' : `. ${item.gap} day${item.gap === 1 ? '' : 's'} after the previous paper.`}
+                          </span>
+                        </li>
+                      ))}
+                    </ul>
+                  </div>
+                )}
 
                 <div className="mt-6 flex justify-end">
                   <button

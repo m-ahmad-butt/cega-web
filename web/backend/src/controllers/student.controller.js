@@ -3,6 +3,8 @@ const {
   formatDoc, formatDocs,
 } = require('../models');
 const agentService = require('../services/agent.service');
+const emailService = require('../services/email.service');
+const { buildView, renderDateSheetPdf } = require('../services/datesheetPdf.service');
 
 // ── Helpers ──
 
@@ -198,7 +200,27 @@ const saveDateSheet = async (req, res) => {
       await usedChangeRequest.save();
     }
 
-    res.status(200).json({ message: 'Date sheet saved successfully' });
+    let emailed = false;
+    try {
+      const fresh = await User.findById(user._id).populate('selectedBranch').lean();
+      const saved = await DateSheetSelection.find({ student: user._id })
+        .populate('course')
+        .populate('examSlot')
+        .lean();
+      const view = buildView(fresh, saved);
+      const pdf = await renderDateSheetPdf(view);
+      await emailService.sendDateSheet(fresh.email, fresh.fullName, pdf, view.rows);
+      emailed = true;
+    } catch (err) {
+      console.error('[Email] Date sheet email failed:', err.message);
+    }
+
+    res.status(200).json({
+      message: emailed
+        ? 'Date sheet saved. A copy was sent to your email.'
+        : 'Date sheet saved. The email could not be sent. You can download the PDF from the date sheet page.',
+      data: { emailed },
+    });
   } catch (error) {
     console.error('saveDateSheet error:', error);
     res.status(500).json({ message: 'Server error' });
@@ -238,6 +260,26 @@ const getDateSheet = async (req, res) => {
     });
   } catch (error) {
     console.error('getDateSheet error:', error);
+    res.status(500).json({ message: 'Server error' });
+  }
+};
+
+const downloadDateSheet = async (req, res) => {
+  try {
+    const user = await User.findOne({ email: req.user.email }).populate('selectedBranch').lean();
+    if (!user) return res.status(404).json({ message: 'User not found' });
+    if (!user.dateSheetSaved) return res.status(400).json({ message: 'Save your date sheet before downloading it' });
+
+    const selections = await DateSheetSelection.find({ student: user._id })
+      .populate('course')
+      .populate('examSlot')
+      .lean();
+    const pdf = await renderDateSheetPdf(buildView(user, selections));
+    res.setHeader('Content-Type', 'application/pdf');
+    res.setHeader('Content-Disposition', 'attachment; filename="Examination-Date-Sheet.pdf"');
+    res.status(200).send(pdf);
+  } catch (error) {
+    console.error('downloadDateSheet error:', error);
     res.status(500).json({ message: 'Server error' });
   }
 };
@@ -392,6 +434,7 @@ module.exports = {
   getAssignedCourses,
   saveDateSheet,
   getDateSheet,
+  downloadDateSheet,
   createRequest,
   getMyRequests,
   agentChat,

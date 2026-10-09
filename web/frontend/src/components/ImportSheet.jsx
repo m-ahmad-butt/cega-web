@@ -60,13 +60,13 @@ const ImportSheet = ({ kind, onClose, onDone }) => {
     : kind === 'branches'
       ? ['Name', 'Code', 'City', 'Status']
       : kind === 'courses'
-        ? ['Code', 'Title', 'Credits', 'Department']
+        ? ['Code', 'Title', 'Credits', 'Department', 'Level']
         : ['Course', 'Date', 'Start', 'End', 'Capacity'];
 
   const cells = (row) => {
     if (kind === 'students') return [row.fullName, row.registrationNumber, row.program, row.email, row.password];
     if (kind === 'branches') return [row.name, row.code, row.city, row.status];
-    if (kind === 'courses') return [row.courseCode, row.title, row.creditHours, row.department];
+    if (kind === 'courses') return [row.courseCode, row.title, row.creditHours, row.department, row.difficulty];
     return [row.courseCode, row.date, row.startTime, row.endTime, row.capacity];
   };
 

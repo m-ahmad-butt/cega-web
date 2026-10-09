@@ -75,6 +75,7 @@ const courseSchema = new Schema(
     title: { type: String, required: true },
     creditHours: { type: Number, required: true },
     department: { type: String },
+    difficulty: { type: String, enum: ['easy', 'medium', 'hard'], default: 'medium' },
     status: { type: String, enum: ['active', 'inactive'], default: 'active' },
   },
   { timestamps: true }
