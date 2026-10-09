@@ -2,20 +2,28 @@ const bcrypt = require('bcryptjs');
 const { User, Branch, Course, CourseAssignment, ExamSlot } = require('../models');
 
 const seedAdmin = async () => {
-  const email = 'admin@examslot.com';
-  const hashed = await bcrypt.hash('Admin@123', 10);
+  const email = 'admin@vu.edu.pk';
+  const hashed = await bcrypt.hash('demo', 10);
+  const existing = await User.findOne({
+    $or: [{ email }, { email: 'admin@examslot.com' }, { role: 'ADMIN' }],
+  });
 
-  await User.findOneAndUpdate(
-    { email },
-    {
+  if (existing) {
+    existing.email = email;
+    existing.fullName = existing.fullName || 'VU Admin';
+    existing.password = hashed;
+    existing.role = 'ADMIN';
+    existing.isVerified = true;
+    await existing.save();
+  } else {
+    await User.create({
       email,
-      fullName: 'ExamSlot Admin',
+      fullName: 'VU Admin',
       password: hashed,
       role: 'ADMIN',
       isVerified: true,
-    },
-    { upsert: true, new: true, setDefaultsOnInsert: true }
-  );
+    });
+  }
   console.log(`[SEED] Admin ensured: ${email}`);
 };
 
@@ -51,18 +59,27 @@ const seedCourses = async () => {
 };
 
 const seedStudents = async () => {
-  const hashed = await bcrypt.hash('Student@123', 10);
+  const hashed = await bcrypt.hash('demo', 10);
+
+  const rename = [
+    ['student1@examslot.com', 'm.ahmad.software.engineer@gmail.com'],
+    ['student2@examslot.com', 'payment.io.social@gmail.com'],
+  ];
+  for (const [from, to] of rename) {
+    const taken = await User.findOne({ email: to });
+    if (!taken) await User.updateOne({ email: from }, { email: to });
+  }
 
   const students = [
     {
-      email: 'student1@examslot.com', fullName: 'Ahmed Khan', phone: '0300-1234567', cnic: '35201-1234567-1',
+      email: 'm.ahmad.software.engineer@gmail.com', fullName: 'Muhammad Ahmad', phone: '0300-1234567', cnic: '35201-1234567-1',
       dob: new Date('2002-05-15'), gender: 'Male', address: '123 Main St, Lahore',
       fatherName: 'Muhammad Khan', parentCnic: '35201-7654321-1', parentOccupation: 'Engineer', parentContact: '0300-7654321', emergencyContact: '0301-1234567',
       registrationNumber: 'FA20-BCS-001', program: 'BS Computer Science', semester: '5th', session: 'Fall 2020',
       previousQualification: 'FSc Pre-Engineering', previousInstitute: 'Govt College Lahore', previousMarks: '89%',
     },
     {
-      email: 'student2@examslot.com', fullName: 'Fatima Ali', phone: '0321-2345678', cnic: '35201-2345678-2',
+      email: 'payment.io.social@gmail.com', fullName: 'Fatima Ali', phone: '0321-2345678', cnic: '35201-2345678-2',
       dob: new Date('2003-08-22'), gender: 'Female', address: '45 Garden Town, Lahore',
       fatherName: 'Ali Ahmed', parentCnic: '35201-8765432-2', parentOccupation: 'Doctor', parentContact: '0321-8765432', emergencyContact: '0322-2345678',
       registrationNumber: 'FA21-BCS-002', program: 'BS Computer Science', semester: '3rd', session: 'Fall 2021',
@@ -108,8 +125,8 @@ const seedAssignmentsAndSlots = async () => {
   courses.forEach((c) => { courseMap[c.courseCode] = c._id; });
 
   const assignmentMap = {
-    'student1@examslot.com': ['CS101', 'CS201', 'CS301', 'CS401', 'MT101'],
-    'student2@examslot.com': ['CS101', 'CS201', 'MT101', 'MT201', 'EE101'],
+    'm.ahmad.software.engineer@gmail.com': ['CS101', 'CS201', 'CS301', 'CS401', 'MT101'],
+    'payment.io.social@gmail.com': ['CS101', 'CS201', 'MT101', 'MT201', 'EE101'],
     'student3@examslot.com': ['CS301', 'CS401', 'CS501', 'MT201', 'EE101', 'CS201'],
     'student4@examslot.com': ['CS101', 'MT101', 'MT201', 'EE101'],
     'student5@examslot.com': ['CS401', 'CS501', 'CS301', 'MT201', 'CS201', 'EE101'],

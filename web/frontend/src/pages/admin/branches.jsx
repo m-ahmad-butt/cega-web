@@ -4,7 +4,8 @@ import Pagination from '../../components/Pagination';
 import ConfirmModal from '../../components/ConfirmModal';
 import { adminAPI } from '../../utils/api';
 import { useGuide, useWarn } from '../../components/GuideModal';
-import { Plus, Pencil, Trash2, Search, X, Loader2 } from 'lucide-react';
+import { Plus, Pencil, Trash2, Search, X, Loader2, Upload } from 'lucide-react';
+import ImportSheet from '../../components/ImportSheet';
 
 const empty = { name: '', code: '', city: '', address: '', contactNumber: '', status: 'ACTIVE' };
 
@@ -21,6 +22,7 @@ const AdminBranches = () => {
   const [editId, setEditId] = useState(null);
   const [saving, setSaving] = useState(false);
   const [deleteTarget, setDeleteTarget] = useState(null);
+  const [importOpen, setImportOpen] = useState(false);
 
   const load = useCallback(async () => {
     setLoading(true);
@@ -38,7 +40,7 @@ const AdminBranches = () => {
   useEffect(() => { load(); }, [load]);
 
   const openAdd = () => { setForm(empty); setEditId(null); setModalOpen(true); };
-  const openEdit = (b) => { setForm({ name: b.name, code: b.code, city: b.city || '', address: b.address || '', contactNumber: b.contactNumber || '', status: b.status || 'ACTIVE' }); setEditId(b._id); setModalOpen(true); };
+  const openEdit = (b) => { setForm({ name: b.name, code: b.code, city: b.city || '', address: b.address || '', contactNumber: b.contactNumber || '', status: b.status || 'ACTIVE' }); setEditId(b.id || b._id); setModalOpen(true); };
   const closeModal = () => { setModalOpen(false); setForm(empty); setEditId(null); };
 
   const handleSave = async (e) => {
@@ -64,7 +66,7 @@ const AdminBranches = () => {
 
   const handleDelete = async () => {
     try {
-      await adminAPI.deleteBranch(deleteTarget._id);
+      await adminAPI.deleteBranch(deleteTarget.id || deleteTarget._id);
       say({ title: 'Done', body: 'Branch deleted', action: 'OK' });
       setDeleteTarget(null);
       load();
@@ -81,7 +83,10 @@ const AdminBranches = () => {
       <div className="mx-auto max-w-7xl px-4 py-8 sm:px-6">
         <div className="mb-6 flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
           <h1 className="text-2xl font-bold tracking-tight">Branches</h1>
-          <button onClick={openAdd} className="n-btn"><Plus size={16} /> Add Branch</button>
+          <div className="flex flex-wrap gap-2">
+            <button onClick={() => setImportOpen(true)} className="n-btn-secondary"><Upload size={16} /> Upload</button>
+            <button onClick={openAdd} className="n-btn"><Plus size={16} /> Add Branch</button>
+          </div>
         </div>
 
         <div className="relative mb-4 max-w-sm">
@@ -109,7 +114,7 @@ const AdminBranches = () => {
                 </tr></thead>
                 <tbody>
                   {branches.map((b) => (
-                    <tr key={b._id} className="hover:bg-notion-surface/50 transition-colors">
+                    <tr key={b.id || b._id} className="hover:bg-notion-surface/50 transition-colors">
                       <td className="n-td font-medium">{b.name}</td>
                       <td className="n-td">{b.code}</td>
                       <td className="n-td">{b.city}</td>
@@ -132,7 +137,7 @@ const AdminBranches = () => {
             {/* Mobile cards */}
             <div className="flex flex-col gap-3 md:hidden">
               {branches.map((b) => (
-                <div key={b._id} className="n-card p-4">
+                <div key={b.id || b._id} className="n-card p-4">
                   <div className="mb-2 flex items-center justify-between">
                     <span className="font-semibold">{b.name}</span>
                     <span className={`n-tag ${b.status === 'ACTIVE' ? 'bg-notion-green-soft text-notion-green' : 'bg-notion-red-soft text-notion-red'}`}>{b.status}</span>
@@ -193,6 +198,17 @@ const AdminBranches = () => {
         confirmText="Delete"
         danger
       />
+      {importOpen && (
+        <ImportSheet
+          kind="branches"
+          onClose={() => setImportOpen(false)}
+          onDone={(result) => {
+            setImportOpen(false);
+            say({ title: 'Import finished', body: `Saved ${result.created || 0}. Skipped ${result.skipped || 0}.`, action: 'OK' });
+            load();
+          }}
+        />
+      )}
     </div>
   );
 };

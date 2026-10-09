@@ -5,7 +5,8 @@ import Pagination from '../../components/Pagination';
 import ConfirmModal from '../../components/ConfirmModal';
 import { adminAPI } from '../../utils/api';
 import { useGuide, useWarn } from '../../components/GuideModal';
-import { Plus, Trash2, Search, X, Loader2, Eye, ScanLine } from 'lucide-react';
+import { Plus, Trash2, Search, X, Loader2, Eye, ScanLine, Upload, KeyRound } from 'lucide-react';
+import ImportSheet from '../../components/ImportSheet';
 
 const emptyPersonal = { fullName: '', email: '', phone: '', cnic: '', dob: '', gender: '', address: '' };
 const emptyParent = { fatherName: '', parentCnic: '', parentOccupation: '', parentContact: '', emergencyContact: '' };
@@ -29,6 +30,7 @@ const AdminStudents = () => {
   const [saving, setSaving] = useState(false);
   const [ocrLoading, setOcrLoading] = useState(false);
   const [deleteTarget, setDeleteTarget] = useState(null);
+  const [importOpen, setImportOpen] = useState(false);
 
   const load = useCallback(async () => {
     setLoading(true);
@@ -72,9 +74,26 @@ const AdminStudents = () => {
     }
   };
 
+  const handleReset = async (student) => {
+    try {
+      const { data } = await adminAPI.resetStudentPassword(student.id || student._id);
+      const password = data.data?.password;
+      const emailed = data.data?.emailed;
+      say({
+        title: 'Password reset',
+        body: emailed
+          ? `Emailed to ${student.email}. New password: ${password}`
+          : `Email failed. New password: ${password}`,
+        action: 'OK',
+      });
+    } catch (err) {
+      warn(err.response?.data?.message || 'Could not reset password');
+    }
+  };
+
   const handleDelete = async () => {
     try {
-      await adminAPI.deleteStudent(deleteTarget._id);
+      await adminAPI.deleteStudent(deleteTarget.id || deleteTarget._id);
       say({ title: 'Done', body: 'Student deleted', action: 'OK' });
       setDeleteTarget(null);
       load();
@@ -126,7 +145,10 @@ const AdminStudents = () => {
       <div className="mx-auto max-w-7xl px-4 py-8 sm:px-6">
         <div className="mb-6 flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
           <h1 className="text-2xl font-bold tracking-tight">Students</h1>
-          <button onClick={openAdd} className="n-btn"><Plus size={16} /> Add Student</button>
+          <div className="flex flex-wrap gap-2">
+            <button onClick={() => setImportOpen(true)} className="n-btn-secondary"><Upload size={16} /> Upload</button>
+            <button onClick={openAdd} className="n-btn"><Plus size={16} /> Add Student</button>
+          </div>
         </div>
 
         <div className="relative mb-4 max-w-sm">
@@ -149,7 +171,7 @@ const AdminStudents = () => {
                 </tr></thead>
                 <tbody>
                   {students.map((s) => (
-                    <tr key={s._id} className="hover:bg-notion-surface/50 transition-colors cursor-pointer" onClick={() => navigate(`/admin/students/${s._id}`)}>
+                    <tr key={s.id || s._id} className="hover:bg-notion-surface/50 transition-colors cursor-pointer" onClick={() => navigate(`/admin/students/${s.id || s._id}`)}>
                       <td className="n-td font-medium">{s.registrationNumber}</td>
                       <td className="n-td">{s.fullName}</td>
                       <td className="n-td text-notion-muted">{s.email}</td>
@@ -162,7 +184,8 @@ const AdminStudents = () => {
                         </span>
                       </td>
                       <td className="n-td text-right" onClick={(e) => e.stopPropagation()}>
-                        <button onClick={() => navigate(`/admin/students/${s._id}`)} className="n-btn-ghost p-1.5"><Eye size={14} /></button>
+                        <button onClick={() => handleReset(s)} className="n-btn-ghost p-1.5" title="Reset password"><KeyRound size={14} /></button>
+                        <button onClick={() => navigate(`/admin/students/${s.id || s._id}`)} className="n-btn-ghost p-1.5"><Eye size={14} /></button>
                         <button onClick={() => setDeleteTarget(s)} className="n-btn-ghost p-1.5 text-notion-red"><Trash2 size={14} /></button>
                       </td>
                     </tr>
@@ -173,7 +196,7 @@ const AdminStudents = () => {
 
             <div className="flex flex-col gap-3 md:hidden">
               {students.map((s) => (
-                <div key={s._id} className="n-card p-4 cursor-pointer" onClick={() => navigate(`/admin/students/${s._id}`)}>
+                <div key={s.id || s._id} className="n-card p-4 cursor-pointer" onClick={() => navigate(`/admin/students/${s.id || s._id}`)}>
                   <div className="mb-1 flex items-center justify-between">
                     <span className="font-semibold">{s.fullName}</span>
                     <span className={`n-tag ${s.dateSheetSaved ? 'bg-notion-green-soft text-notion-green' : 'bg-notion-yellow-soft text-notion-yellow'}`}>
@@ -267,6 +290,17 @@ const AdminStudents = () => {
       )}
 
       <ConfirmModal isOpen={!!deleteTarget} onClose={() => setDeleteTarget(null)} onConfirm={handleDelete} title="Delete Student" message={`Delete "${deleteTarget?.fullName}"? This cannot be undone.`} confirmText="Delete" danger />
+      {importOpen && (
+        <ImportSheet
+          kind="students"
+          onClose={() => setImportOpen(false)}
+          onDone={(result) => {
+            setImportOpen(false);
+            say({ title: 'Import finished', body: `Added ${result.created || 0}. Skipped ${result.skipped || 0}.`, action: 'OK' });
+            load();
+          }}
+        />
+      )}
     </div>
   );
 };

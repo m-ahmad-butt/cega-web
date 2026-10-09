@@ -1,5 +1,4 @@
 import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom';
-import { Toaster } from 'react-hot-toast';
 import ProtectedRoute from './components/ProtectedRoute';
 import LandingPage from './pages/landing';
 import LoginPage from './pages/login';
@@ -21,22 +20,6 @@ import { AgentPanelProvider } from './components/AgentPanel';
 function App() {
   return (
     <BrowserRouter>
-      <Toaster
-        position="top-center"
-        toastOptions={{
-          style: {
-            background: '#ffffff',
-            color: '#37352f',
-            border: '1px solid #e9e9e7',
-            borderRadius: '8px',
-            fontFamily: 'Inter, sans-serif',
-            fontSize: '14px',
-            boxShadow: '0 8px 30px rgba(0,0,0,0.08)',
-          },
-          success: { iconTheme: { primary: '#448361', secondary: '#ffffff' } },
-          error: { iconTheme: { primary: '#e03e3e', secondary: '#ffffff' } },
-        }}
-      />
       <AgentPanelProvider>
         <Routes>
           <Route path="/" element={<LandingPage />} />

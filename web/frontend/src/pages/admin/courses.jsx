@@ -4,7 +4,8 @@ import Pagination from '../../components/Pagination';
 import ConfirmModal from '../../components/ConfirmModal';
 import { adminAPI } from '../../utils/api';
 import { useGuide, useWarn } from '../../components/GuideModal';
-import { Plus, Pencil, Trash2, Search, X, Loader2 } from 'lucide-react';
+import { Plus, Pencil, Trash2, Search, X, Loader2, Upload } from 'lucide-react';
+import ImportSheet from '../../components/ImportSheet';
 
 const empty = { courseCode: '', title: '', creditHours: 3, department: '', status: 'ACTIVE' };
 
@@ -21,6 +22,7 @@ const AdminCourses = () => {
   const [editId, setEditId] = useState(null);
   const [saving, setSaving] = useState(false);
   const [deleteTarget, setDeleteTarget] = useState(null);
+  const [importOpen, setImportOpen] = useState(false);
 
   const load = useCallback(async () => {
     setLoading(true);
@@ -38,7 +40,7 @@ const AdminCourses = () => {
   useEffect(() => { load(); }, [load]);
 
   const openAdd = () => { setForm(empty); setEditId(null); setModalOpen(true); };
-  const openEdit = (c) => { setForm({ courseCode: c.courseCode, title: c.title, creditHours: c.creditHours || 3, department: c.department || '', status: c.status || 'ACTIVE' }); setEditId(c._id); setModalOpen(true); };
+  const openEdit = (c) => { setForm({ courseCode: c.courseCode, title: c.title, creditHours: c.creditHours || 3, department: c.department || '', status: c.status || 'ACTIVE' }); setEditId(c.id || c._id); setModalOpen(true); };
   const closeModal = () => { setModalOpen(false); setForm(empty); setEditId(null); };
 
   const handleSave = async (e) => {
@@ -64,7 +66,7 @@ const AdminCourses = () => {
 
   const handleDelete = async () => {
     try {
-      await adminAPI.deleteCourse(deleteTarget._id);
+      await adminAPI.deleteCourse(deleteTarget.id || deleteTarget._id);
       say({ title: 'Done', body: 'Course deleted', action: 'OK' });
       setDeleteTarget(null);
       load();
@@ -81,7 +83,10 @@ const AdminCourses = () => {
       <div className="mx-auto max-w-7xl px-4 py-8 sm:px-6">
         <div className="mb-6 flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
           <h1 className="text-2xl font-bold tracking-tight">Courses</h1>
-          <button onClick={openAdd} className="n-btn"><Plus size={16} /> Add Course</button>
+          <div className="flex flex-wrap gap-2">
+            <button onClick={() => setImportOpen(true)} className="n-btn-secondary"><Upload size={16} /> Upload</button>
+            <button onClick={openAdd} className="n-btn"><Plus size={16} /> Add Course</button>
+          </div>
         </div>
 
         <div className="relative mb-4 max-w-sm">
@@ -103,7 +108,7 @@ const AdminCourses = () => {
                 </tr></thead>
                 <tbody>
                   {courses.map((c) => (
-                    <tr key={c._id} className="hover:bg-notion-surface/50 transition-colors">
+                    <tr key={c.id || c._id} className="hover:bg-notion-surface/50 transition-colors">
                       <td className="n-td font-medium">{c.courseCode}</td>
                       <td className="n-td">{c.title}</td>
                       <td className="n-td">{c.creditHours}</td>
@@ -123,7 +128,7 @@ const AdminCourses = () => {
 
             <div className="flex flex-col gap-3 md:hidden">
               {courses.map((c) => (
-                <div key={c._id} className="n-card p-4">
+                <div key={c.id || c._id} className="n-card p-4">
                   <div className="mb-2 flex items-center justify-between">
                     <span className="font-semibold">{c.courseCode}</span>
                     <span className={`n-tag ${c.status === 'ACTIVE' ? 'bg-notion-green-soft text-notion-green' : 'bg-notion-red-soft text-notion-red'}`}>{c.status}</span>
@@ -174,6 +179,17 @@ const AdminCourses = () => {
       )}
 
       <ConfirmModal isOpen={!!deleteTarget} onClose={() => setDeleteTarget(null)} onConfirm={handleDelete} title="Delete Course" message={`Delete "${deleteTarget?.title}"? This cannot be undone.`} confirmText="Delete" danger />
+      {importOpen && (
+        <ImportSheet
+          kind="courses"
+          onClose={() => setImportOpen(false)}
+          onDone={(result) => {
+            setImportOpen(false);
+            say({ title: 'Import finished', body: `Saved ${result.created || 0}. Skipped ${result.skipped || 0}.`, action: 'OK' });
+            load();
+          }}
+        />
+      )}
     </div>
   );
 };

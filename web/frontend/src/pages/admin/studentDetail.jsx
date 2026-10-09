@@ -4,7 +4,7 @@ import AdminNavbar from '../../components/AdminNavbar';
 import ConfirmModal from '../../components/ConfirmModal';
 import { adminAPI } from '../../utils/api';
 import { useGuide, useWarn } from '../../components/GuideModal';
-import { ArrowLeft, Plus, Trash2, Loader2, X, AlertTriangle } from 'lucide-react';
+import { ArrowLeft, Plus, Trash2, Loader2, X, AlertTriangle, KeyRound } from 'lucide-react';
 
 const AdminStudentDetail = () => {
   const { id } = useParams();
@@ -148,6 +148,27 @@ const AdminStudentDetail = () => {
             <h1 className="text-2xl font-bold tracking-tight">{student.fullName}</h1>
             <p className="text-sm text-notion-muted">{student.registrationNumber} · {student.email}</p>
           </div>
+          <button
+            onClick={async () => {
+              try {
+                const { data } = await adminAPI.resetStudentPassword(id);
+                const password = data.data?.password;
+                const emailed = data.data?.emailed;
+                say({
+                  title: 'Password reset',
+                  body: emailed
+                    ? `Emailed to ${student.email}. New password: ${password}`
+                    : `Email failed. New password: ${password}`,
+                  action: 'OK',
+                });
+              } catch (err) {
+                warn(err.response?.data?.message || 'Could not reset password');
+              }
+            }}
+            className="n-btn-secondary"
+          >
+            <KeyRound size={16} /> Reset password
+          </button>
           <button onClick={openEditModal} className="n-btn-secondary">Edit</button>
         </div>
 

@@ -6,6 +6,7 @@ const {
 } = require('../models');
 const emailService = require('../services/email.service');
 const { extractCnicFields } = require('../services/cnicOcr.service');
+const importService = require('../services/import.service');
 
 // ── Helpers ──
 
@@ -635,6 +636,54 @@ const ocrCnic = async (req, res) => {
   }
 };
 
+const resetStudentPassword = async (req, res) => {
+  try {
+    const student = await User.findOne({ _id: req.params.id, role: 'STUDENT' });
+    if (!student) return res.status(404).json({ message: 'Student not found' });
+    const plain = importService.issueStudentPassword();
+    student.password = await bcrypt.hash(plain, 10);
+    student.isVerified = true;
+    student.passwordSetupToken = null;
+    student.passwordSetupExpiry = null;
+    await student.save();
+    let emailed = true;
+    try {
+      await emailService.sendAccountPassword(student.email, student.fullName, plain, true);
+    } catch (err) {
+      emailed = false;
+      console.error('[Email] Reset password email failed:', err.message);
+    }
+    res.status(200).json({
+      message: emailed ? 'Password reset and emailed' : 'Password reset. Email could not be sent',
+      data: { password: plain, emailed },
+    });
+  } catch (error) {
+    console.error('resetStudentPassword error:', error);
+    res.status(500).json({ message: 'Server error' });
+  }
+};
+
+const previewImport = async (req, res) => {
+  try {
+    if (!req.file) return res.status(400).json({ message: 'Upload a CSV or Excel file' });
+    const data = importService.previewImport(req.params.kind, req.file.buffer);
+    res.status(200).json({ data });
+  } catch (error) {
+    console.error('previewImport error:', error);
+    res.status(error.status || 400).json({ message: error.message || 'Could not read the file' });
+  }
+};
+
+const commitImport = async (req, res) => {
+  try {
+    const data = await importService.commitImport(req.params.kind, req.body.rows);
+    res.status(200).json({ message: `Saved ${data.created}`, data });
+  } catch (error) {
+    console.error('commitImport error:', error);
+    res.status(error.status || 500).json({ message: error.message || 'Import failed' });
+  }
+};
+
 module.exports = {
   listBranches, createBranch, getBranch, updateBranch, deleteBranch,
   listCourses, createCourse, getCourse, updateCourse, deleteCourse,
@@ -644,4 +693,7 @@ module.exports = {
   listRequests, handleRequest,
   getDashboardStats,
   ocrCnic,
+  resetStudentPassword,
+  previewImport,
+  commitImport,
 };

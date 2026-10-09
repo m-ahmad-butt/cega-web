@@ -5,7 +5,6 @@ import { setCredentials } from '../store/slices/authSlice';
 import { authAPI } from '../utils/api';
 import { homePathFor, isAdmin } from '../utils/roles';
 import { useGuide } from '../components/GuideModal';
-import toast from 'react-hot-toast';
 import BrandLogo from '../components/BrandLogo';
 import { LogIn, Eye, EyeOff, ArrowLeft } from 'lucide-react';
 
@@ -27,7 +26,15 @@ const LoginPage = () => {
 
   const handleSubmit = async (e) => {
     e.preventDefault();
-    if (!email || !password) return toast.error('Please fill in all fields');
+    if (!email || !password) {
+      return say({
+        title: 'Missing details',
+        kicker: 'Sign in',
+        body: 'Enter both your email and password.',
+        action: 'OK',
+        isError: true,
+      });
+    }
 
     setLoading(true);
     try {
@@ -77,7 +84,14 @@ const LoginPage = () => {
 
       navigate(homePathFor(data.user));
     } catch (err) {
-      toast.error(err.response?.data?.message || 'Login failed');
+      say({
+        title: 'Could not sign in',
+        kicker: 'Sign in',
+        body: err.response?.data?.message || 'Login failed',
+        hint: 'Check the email and password, then try again.',
+        action: 'Try again',
+        isError: true,
+      });
     } finally {
       setLoading(false);
     }

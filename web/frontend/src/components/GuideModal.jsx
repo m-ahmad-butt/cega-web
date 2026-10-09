@@ -46,6 +46,34 @@ function GuideDialog({ note, onClose }) {
     return () => window.removeEventListener('keydown', handler);
   }, [onClose]);
 
+  if (note.isError) {
+    return (
+      <div className="fixed inset-0 z-[999] flex items-center justify-center bg-[#37352f]/20 p-4 backdrop-blur-[2px]">
+        <div
+          role="dialog"
+          aria-modal="true"
+          className="n-card w-full max-w-md p-6 shadow-notion-lg"
+        >
+          <div className="flex items-start justify-between gap-4">
+            <h2 className="text-lg font-semibold tracking-tight text-notion-text">{note.title}</h2>
+            {note.kicker && (
+              <span className="shrink-0 rounded-full bg-notion-red-soft px-2.5 py-0.5 text-[10px] font-semibold uppercase tracking-[0.1em] text-notion-red">
+                {note.kicker}
+              </span>
+            )}
+          </div>
+          <p className="mt-2 text-sm leading-relaxed text-notion-muted">{note.body}</p>
+          {note.hint && <p className="mt-3 text-sm font-medium text-notion-text">{note.hint}</p>}
+          <div className="mt-5 flex justify-end">
+            <button type="button" className="n-btn" onClick={onClose}>
+              {note.action ?? 'OK'}
+            </button>
+          </div>
+        </div>
+      </div>
+    );
+  }
+
   return (
     <div className="fixed inset-0 z-[999] overflow-hidden bg-[#37352f]/10 backdrop-blur-[1px]">
       <div className="absolute right-5 top-1/2 w-[min(30rem,calc(100%-2.5rem))] -translate-y-1/2 sm:right-8">

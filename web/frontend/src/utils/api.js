@@ -73,6 +73,15 @@ export const adminAPI = {
   getStudent: (id) => api.get(`/api/admin/students/${id}`),
   updateStudent: (id, data) => api.put(`/api/admin/students/${id}`, data),
   deleteStudent: (id) => api.delete(`/api/admin/students/${id}`),
+  resetStudentPassword: (id) => api.post(`/api/admin/students/${id}/reset-password`),
+  previewImport: (kind, formData) =>
+    api.post(`/api/admin/import/${kind}/preview`, formData, {
+      transformRequest: [(data, headers) => {
+        delete headers['Content-Type'];
+        return data;
+      }],
+    }),
+  commitImport: (kind, data) => api.post(`/api/admin/import/${kind}/commit`, data),
 
   getStudentAssignments: (studentId) => api.get(`/api/admin/students/${studentId}/assignments`),
   assignCourse: (data) => api.post('/api/admin/assignments', data),

@@ -204,6 +204,29 @@ class EmailService {
     return await this.transporter.sendMail(mailOptions);
   }
 
+  async sendAccountPassword(email, name, password, isReset = false) {
+    const loginUrl = `${process.env.FRONTEND_URL || ''}/login`;
+    const title = isReset ? 'Your ExamSlot password was reset' : 'Your ExamSlot login';
+    const content = `
+      <h2 style="color: #333; margin-bottom: 20px;">${title}</h2>
+      <p style="color: #555; line-height: 1.6;">Dear ${name || 'Student'},</p>
+      <p style="color: #555; line-height: 1.6;">Use these details to sign in:</p>
+      <div style="background-color: #f8f9fa; border-radius: 8px; padding: 15px; margin: 20px 0;">
+        <p style="margin: 0 0 8px; color: #333;"><strong>Email:</strong> ${email}</p>
+        <p style="margin: 0; color: #333;"><strong>Password:</strong> ${password}</p>
+      </div>
+      <div style="text-align: center; margin: 30px 0;">
+        <a href="${loginUrl}" style="display: inline-block; background-color: #000000; color: #ffffff; padding: 14px 40px; text-decoration: none; border-radius: 6px; font-weight: bold;">Sign in</a>
+      </div>
+    `;
+    return await this.transporter.sendMail({
+      from: `"ExamSlot" <${process.env.EMAIL_USER}>`,
+      to: email,
+      subject: title,
+      html: this.getEmailTemplate(content, title),
+    });
+  }
+
   async testConnection() {
     try {
       await this.transporter.verify();

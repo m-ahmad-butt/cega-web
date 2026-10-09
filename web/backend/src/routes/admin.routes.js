@@ -4,13 +4,18 @@ const { requireAdmin } = require('../middleware/auth.middleware');
 const adminController = require('../controllers/admin.controller');
 
 const router = express.Router();
-const upload = multer({
+const imageUpload = multer({
   storage: multer.memoryStorage(),
   limits: { fileSize: 8 * 1024 * 1024 },
   fileFilter: (_req, file, cb) => {
     if (/^image\/(jpeg|jpg|png|webp)$/i.test(file.mimetype)) cb(null, true);
     else cb(new Error('Only JPEG/PNG/WebP images allowed'));
   },
+});
+
+const sheetUpload = multer({
+  storage: multer.memoryStorage(),
+  limits: { fileSize: 5 * 1024 * 1024 },
 });
 
 // Dashboard
@@ -32,7 +37,11 @@ router.delete('/courses/:id', requireAdmin, adminController.deleteCourse);
 
 // Students
 router.get('/students', requireAdmin, adminController.listStudents);
-router.post('/students/ocr-cnic', requireAdmin, upload.single('cnic'), adminController.ocrCnic);
+router.post('/students/ocr-cnic', requireAdmin, imageUpload.single('cnic'), adminController.ocrCnic);
+router.post('/students/:id/reset-password', requireAdmin, adminController.resetStudentPassword);
+
+router.post('/import/:kind/preview', requireAdmin, sheetUpload.single('file'), adminController.previewImport);
+router.post('/import/:kind/commit', requireAdmin, adminController.commitImport);
 router.post('/students', requireAdmin, adminController.createStudent);
 router.get('/students/:id', requireAdmin, adminController.getStudent);
 router.put('/students/:id', requireAdmin, adminController.updateStudent);

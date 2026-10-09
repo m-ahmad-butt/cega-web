@@ -4,7 +4,8 @@ import Pagination from '../../components/Pagination';
 import ConfirmModal from '../../components/ConfirmModal';
 import { adminAPI } from '../../utils/api';
 import { useGuide, useWarn } from '../../components/GuideModal';
-import { Plus, Pencil, Trash2, X, Loader2, Filter } from 'lucide-react';
+import { Plus, Pencil, Trash2, X, Loader2, Filter, Upload } from 'lucide-react';
+import ImportSheet from '../../components/ImportSheet';
 
 const empty = { courseId: '', date: '', startTime: '', endTime: '', capacity: 30 };
 
@@ -22,6 +23,7 @@ const AdminSlots = () => {
   const [editId, setEditId] = useState(null);
   const [saving, setSaving] = useState(false);
   const [deleteTarget, setDeleteTarget] = useState(null);
+  const [importOpen, setImportOpen] = useState(false);
 
   useEffect(() => {
     const fetchCourses = async () => {
@@ -53,13 +55,13 @@ const AdminSlots = () => {
   const openAdd = () => { setForm(empty); setEditId(null); setModalOpen(true); };
   const openEdit = (s) => {
     setForm({
-      courseId: s.course?._id || s.courseId || '',
+      courseId: s.course?.id || s.course?._id || s.courseId || '',
       date: s.date ? s.date.slice(0, 10) : '',
       startTime: s.startTime || '',
       endTime: s.endTime || '',
       capacity: s.capacity || 30,
     });
-    setEditId(s._id);
+    setEditId(s.id || s._id);
     setModalOpen(true);
   };
   const closeModal = () => { setModalOpen(false); setForm(empty); setEditId(null); };
@@ -88,7 +90,7 @@ const AdminSlots = () => {
   const handleDelete = async () => {
     if ((deleteTarget?.booked || 0) > 0) return warn('Cannot delete a slot that has bookings');
     try {
-      await adminAPI.deleteSlot(deleteTarget._id);
+      await adminAPI.deleteSlot(deleteTarget.id || deleteTarget._id);
       say({ title: 'Done', body: 'Slot deleted', action: 'OK' });
       setDeleteTarget(null);
       load();
@@ -107,14 +109,17 @@ const AdminSlots = () => {
       <div className="mx-auto max-w-7xl px-4 py-8 sm:px-6">
         <div className="mb-6 flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
           <h1 className="text-2xl font-bold tracking-tight">Exam Slots</h1>
-          <button onClick={openAdd} className="n-btn"><Plus size={16} /> Add Slot</button>
+          <div className="flex flex-wrap gap-2">
+            <button onClick={() => setImportOpen(true)} className="n-btn-secondary"><Upload size={16} /> Upload</button>
+            <button onClick={openAdd} className="n-btn"><Plus size={16} /> Add Slot</button>
+          </div>
         </div>
 
         <div className="mb-4 flex items-center gap-2 max-w-sm">
           <Filter size={16} className="text-notion-muted" />
           <select value={filterCourse} onChange={(e) => { setFilterCourse(e.target.value); setPage(1); }} className="n-input">
             <option value="">All Courses</option>
-            {courses.map((c) => <option key={c._id} value={c._id}>{c.courseCode} — {c.title}</option>)}
+            {courses.map((c) => <option key={c.id || c._id} value={c.id || c._id}>{c.courseCode} — {c.title}</option>)}
           </select>
         </div>
 
@@ -133,7 +138,7 @@ const AdminSlots = () => {
                 </tr></thead>
                 <tbody>
                   {slots.map((s) => (
-                    <tr key={s._id} className="hover:bg-notion-surface/50 transition-colors">
+                    <tr key={s.id || s._id} className="hover:bg-notion-surface/50 transition-colors">
                       <td className="n-td font-medium">{s.course?.courseCode || '—'} <span className="text-notion-muted font-normal">— {s.course?.title}</span></td>
                       <td className="n-td">{fmtDate(s.date)}</td>
                       <td className="n-td">{s.startTime}</td>
@@ -152,7 +157,7 @@ const AdminSlots = () => {
 
             <div className="flex flex-col gap-3 md:hidden">
               {slots.map((s) => (
-                <div key={s._id} className="n-card p-4">
+                <div key={s.id || s._id} className="n-card p-4">
                   <div className="mb-1 font-semibold text-sm">{s.course?.courseCode} — {s.course?.title}</div>
                   <p className="text-xs text-notion-muted">{fmtDate(s.date)} · {s.startTime} – {s.endTime}</p>
                   <p className="text-xs text-notion-muted">Capacity: {s.capacity} · Booked: {s.booked || 0}</p>
@@ -180,7 +185,7 @@ const AdminSlots = () => {
                 <label className="n-label">Course *</label>
                 <select value={form.courseId} onChange={(e) => set('courseId', e.target.value)} className="n-input">
                   <option value="">Select course…</option>
-                  {courses.map((c) => <option key={c._id} value={c._id}>{c.courseCode} — {c.title}</option>)}
+                  {courses.map((c) => <option key={c.id || c._id} value={c.id || c._id}>{c.courseCode} — {c.title}</option>)}
                 </select>
               </div>
               <div className="grid gap-3 sm:grid-cols-3">
@@ -201,6 +206,17 @@ const AdminSlots = () => {
       )}
 
       <ConfirmModal isOpen={!!deleteTarget} onClose={() => setDeleteTarget(null)} onConfirm={handleDelete} title="Delete Slot" message="Are you sure you want to delete this exam slot?" confirmText="Delete" danger />
+      {importOpen && (
+        <ImportSheet
+          kind="slots"
+          onClose={() => setImportOpen(false)}
+          onDone={(result) => {
+            setImportOpen(false);
+            say({ title: 'Import finished', body: `Saved ${result.created || 0}. Skipped ${result.skipped || 0}.`, action: 'OK' });
+            load();
+          }}
+        />
+      )}
     </div>
   );
 };
