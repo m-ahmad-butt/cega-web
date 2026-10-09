@@ -1,18 +1,18 @@
 import { useState, useEffect } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { Link } from 'react-router-dom';
 import StudentNavbar from '../../components/StudentNavbar';
 import { studentAPI, unwrap } from '../../utils/api';
 import { useWarn } from '../../components/GuideModal';
-import { Loader2, Printer, Download } from 'lucide-react';
+import { Loader2, Printer, Download, CalendarDays } from 'lucide-react';
 
 const levelLabel = (value) => (value === 'easy' ? 'Easy' : value === 'hard' ? 'Hard' : 'Medium');
 
 const StudentDateSheet = () => {
-  const navigate = useNavigate();
   const warn = useWarn();
-  const [dateSheet, setDateSheet] = useState(null);
+  const [dateSheet, setDateSheet] = useState([]);
   const [profile, setProfile] = useState(null);
   const [loading, setLoading] = useState(true);
+  const [failed, setFailed] = useState(false);
 
   useEffect(() => {
     const init = async () => {
@@ -23,28 +23,21 @@ const StudentDateSheet = () => {
         ]);
         const envelope = dsRes.data?.data || dsRes.data || {};
         const ds = envelope.selections || envelope.entries || envelope.dateSheet || [];
-        const studentInfo = envelope.student || unwrap(profRes.data);
-        const prof = {
+        const studentInfo = envelope.student || unwrap(profRes.data) || {};
+        setDateSheet(Array.isArray(ds) ? ds : []);
+        setProfile({
           ...studentInfo,
           branch: studentInfo.branch || studentInfo.selectedBranch || null,
-        };
-
-        if (!Array.isArray(ds) || ds.length === 0) {
-          navigate('/student/dashboard');
-          return;
-        }
-
-        setDateSheet(ds);
-        setProfile(prof);
+        });
       } catch {
+        setFailed(true);
         warn('Failed to load date sheet');
-        navigate('/student/dashboard');
       } finally {
         setLoading(false);
       }
     };
     init();
-  }, [navigate]);
+  }, [warn]);
 
   const fmtDate = (d) => d ? new Date(d).toLocaleDateString('en-PK', { year: 'numeric', month: 'long', day: 'numeric' }) : 'Not set';
   const dayName = (d) => d ? new Date(d).toLocaleDateString('en-PK', { weekday: 'long' }) : 'Not set';
@@ -85,6 +78,27 @@ const StudentDateSheet = () => {
   if (loading) return (
     <div className="n-page"><StudentNavbar />
       <div className="flex justify-center py-20"><Loader2 size={24} className="animate-spin text-notion-muted" /></div>
+    </div>
+  );
+
+  if (failed || dateSheet.length === 0) return (
+    <div className="n-page">
+      <StudentNavbar />
+      <div className="mx-auto max-w-4xl px-4 py-8 sm:px-6">
+        <h1 className="mb-6 text-2xl font-bold tracking-tight">Date Sheet</h1>
+        <div className="n-card p-6 text-center">
+          <CalendarDays size={40} className="mx-auto mb-3 text-notion-muted" />
+          <h2 className="text-lg font-semibold mb-1">
+            {failed ? 'Date sheet could not be loaded' : 'No date sheet yet'}
+          </h2>
+          <p className="text-sm text-notion-muted mb-4">
+            {failed
+              ? 'Try again in a moment. If this keeps happening, go back to the dashboard and save your slots.'
+              : 'Choose a slot for each registered course on the dashboard, then save the date sheet.'}
+          </p>
+          <Link to="/student/dashboard" className="n-btn">Back to Dashboard</Link>
+        </div>
+      </div>
     </div>
   );
 

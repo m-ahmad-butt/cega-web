@@ -641,8 +641,9 @@ const ocrCnic = async (req, res) => {
     const fields = await extractCnicFields(base64, mimeType);
     res.status(200).json({ data: fields });
   } catch (error) {
-    console.error('ocrCnic error:', error.response?.data || error.message);
-    res.status(502).json({ message: error.message || 'CNIC OCR failed' });
+    const detail = error.response?.data?.error?.message || error.message;
+    console.error('ocrCnic error:', detail);
+    res.status(502).json({ message: detail || 'CNIC OCR failed' });
   }
 };
 

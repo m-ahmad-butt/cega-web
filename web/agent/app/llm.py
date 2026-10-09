@@ -9,7 +9,7 @@ from groq import Groq
 
 GROQ_API_KEY = os.getenv("GROQ_API_KEY", "")
 LLM_MODEL = os.getenv("LLM_MODEL", "openai/gpt-oss-20b")
-VISION_MODEL = os.getenv("VISION_MODEL", "meta-llama/llama-4-scout-17b-16e-instruct")
+VISION_MODEL = os.getenv("VISION_MODEL", "qwen/qwen3.8-27b")
 
 _client: Groq | None = None
 

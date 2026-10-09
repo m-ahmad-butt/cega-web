@@ -68,7 +68,10 @@ export const adminAPI = {
   createStudent: (data) => api.post('/api/admin/students', data),
   ocrCnic: (formData) =>
     api.post('/api/admin/students/ocr-cnic', formData, {
-      headers: { 'Content-Type': 'multipart/form-data' },
+      transformRequest: [(data, headers) => {
+        delete headers['Content-Type'];
+        return data;
+      }],
     }),
   getStudent: (id) => api.get(`/api/admin/students/${id}`),
   updateStudent: (id, data) => api.put(`/api/admin/students/${id}`, data),

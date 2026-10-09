@@ -114,6 +114,7 @@ const AgentPanel = ({ open, onClose }) => {
 
   const togglePref = (id) => {
     setPrefs((prev) => (prev.includes(id) ? prev.filter((p) => p !== id) : [...prev, id]));
+    setPrefsOpen(false); // hide dropdown after choosing a preference
   };
 
   const send = async ({ message, action } = {}) => {

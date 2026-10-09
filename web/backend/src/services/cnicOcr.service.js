@@ -1,7 +1,14 @@
 const axios = require('axios');
 
 const GROQ_API_KEY = process.env.GROQ_API_KEY;
-const VISION_MODEL = process.env.VISION_MODEL || 'meta-llama/llama-4-scout-17b-16e-instruct';
+const RETIRED_VISION_MODELS = new Set([
+  'meta-llama/llama-4-scout-17b-16e-instruct',
+  'meta-llama/llama-4-maverick-17b-128e-instruct',
+]);
+const configuredVision = process.env.VISION_MODEL;
+const VISION_MODEL = !configuredVision || RETIRED_VISION_MODELS.has(configuredVision)
+  ? 'qwen/qwen3.8-27b'
+  : configuredVision;
 
 const genderOf = (value) => {
   const v = String(value || '').trim().toLowerCase();
@@ -76,7 +83,8 @@ const extractCnicFields = async (base64, mimeType = 'image/jpeg') => {
     }
   );
 
-  const content = data?.choices?.[0]?.message?.content || '';
+  const message = data?.choices?.[0]?.message || {};
+  const content = message.content || message.reasoning || '';
   const parsed = extractJson(content);
   return {
     fullName: parsed.fullName || '',
