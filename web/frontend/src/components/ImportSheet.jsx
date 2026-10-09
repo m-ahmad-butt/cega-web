@@ -74,7 +74,7 @@ const ImportSheet = ({ kind, onClose, onDone }) => {
   };
 
   return (
-    <div className="fixed inset-0 z-[60] flex items-end justify-center bg-black/30 p-4 sm:items-center">
+    <div className="fixed inset-0 z-[120] flex items-end justify-center bg-black/30 p-4 sm:items-center">
       <div className="n-card flex max-h-[85vh] w-full max-w-4xl flex-col overflow-hidden">
         <div className="flex items-center justify-between border-b border-notion-border px-5 py-4">
           <div>

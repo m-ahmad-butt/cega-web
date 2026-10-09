@@ -3,6 +3,25 @@ const axios = require('axios');
 const GROQ_API_KEY = process.env.GROQ_API_KEY;
 const VISION_MODEL = process.env.VISION_MODEL || 'meta-llama/llama-4-scout-17b-16e-instruct';
 
+const genderOf = (value) => {
+  const v = String(value || '').trim().toLowerCase();
+  if (v.startsWith('m')) return 'Male';
+  if (v.startsWith('f')) return 'Female';
+  if (v) return 'Other';
+  return '';
+};
+
+const dateOf = (value) => {
+  const text = String(value || '').trim();
+  if (!text) return '';
+  if (/^\d{4}-\d{2}-\d{2}/.test(text)) return text.slice(0, 10);
+  const parts = text.match(/^(\d{1,2})[./-](\d{1,2})[./-](\d{4})$/);
+  if (!parts) return '';
+  const day = parts[1].padStart(2, '0');
+  const month = parts[2].padStart(2, '0');
+  return `${parts[3]}-${month}-${day}`;
+};
+
 const extractJson = (text) => {
   const trimmed = (text || '').trim();
   try {
@@ -33,8 +52,10 @@ const extractCnicFields = async (base64, mimeType = 'image/jpeg') => {
         {
           role: 'system',
           content:
-            'You extract fields from a Pakistan CNIC / B-Form image. ' +
-            'Return JSON only with keys: fullName, cnic, dob (YYYY-MM-DD), gender (Male|Female|Other), address. ' +
+            'You extract fields from a Pakistan CNIC image, front and back. ' +
+            'Return JSON only with keys: fullName, fatherName, cnic, dob (YYYY-MM-DD), gender (Male|Female|Other), address. ' +
+            'fatherName is the Name of Father or Husband printed on the card. ' +
+            'address is the current address, usually on the back. ' +
             'Use null for unknown fields. Normalize CNIC as #####-#######-# when possible.',
         },
         {
@@ -59,9 +80,10 @@ const extractCnicFields = async (base64, mimeType = 'image/jpeg') => {
   const parsed = extractJson(content);
   return {
     fullName: parsed.fullName || '',
+    fatherName: parsed.fatherName || '',
     cnic: parsed.cnic || '',
-    dob: parsed.dob || '',
-    gender: parsed.gender || '',
+    dob: dateOf(parsed.dob),
+    gender: genderOf(parsed.gender),
     address: parsed.address || '',
   };
 };

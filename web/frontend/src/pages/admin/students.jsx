@@ -123,6 +123,7 @@ const AdminStudents = () => {
         gender: fields.gender || p.gender,
         address: fields.address || p.address,
       }));
+      if (fields.fatherName) setParent((p) => ({ ...p, fatherName: fields.fatherName }));
       setTab('personal');
       say({ title: 'Done', body: 'CNIC fields autofilled — review before saving', action: 'OK' });
     } catch (err) {

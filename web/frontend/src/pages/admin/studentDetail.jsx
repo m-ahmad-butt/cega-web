@@ -58,8 +58,9 @@ const AdminStudentDetail = () => {
 
   const openAssignModal = async () => {
     try {
-      const { data } = await adminAPI.getCourses({ limit: 200 });
-      setCourses(data.courses || data.data || []);
+      const { data } = await adminAPI.getCourses({ pageSize: 100 });
+      const rows = data.data || data.courses || [];
+      setCourses(Array.isArray(rows) ? rows : []);
     } catch {
       warn('Failed to load courses');
     }
@@ -143,6 +144,7 @@ const AdminStudentDetail = () => {
       setEditForm((p) => ({
         ...p,
         fullName: fields.fullName || p.fullName,
+        fatherName: fields.fatherName || p.fatherName,
         cnic: fields.cnic || p.cnic,
         dob: fields.dob ? String(fields.dob).slice(0, 10) : p.dob,
         gender: fields.gender || p.gender,
@@ -156,7 +158,7 @@ const AdminStudentDetail = () => {
     }
   };
 
-  const assignedIds = assignments.map((a) => a.course?._id || a.courseId);
+  const assignedIds = assignments.map((a) => String(a.course?.id || a.course?._id || a.courseId || ''));
 
   if (loading) return (
     <div className="n-page">
@@ -287,12 +289,18 @@ const AdminStudentDetail = () => {
           <div className="relative mx-4 w-full max-w-md animate-in fade-in slide-in-from-bottom-2 rounded-notion-lg bg-white p-6 shadow-notion-lg">
             <button onClick={() => setAssignModalOpen(false)} className="absolute right-4 top-4 text-notion-muted hover:text-notion-text"><X size={18} /></button>
             <h2 className="mb-4 text-lg font-semibold">Assign Course</h2>
+            <button type="button" onClick={() => setImportOpen(true)} className="n-btn-secondary mb-4 w-full text-xs">
+              <Upload size={14} /> Upload registered courses
+            </button>
             <select value={selectedCourse} onChange={(e) => setSelectedCourse(e.target.value)} className="n-input mb-4">
               <option value="">Select a course…</option>
-              {courses.filter((c) => !assignedIds.includes(c._id)).map((c) => (
-                <option key={c._id} value={c._id}>{c.courseCode} — {c.title}</option>
+              {courses.filter((c) => !assignedIds.includes(c.id || c._id)).map((c) => (
+                <option key={c.id || c._id} value={c.id || c._id}>{c.courseCode} — {c.title}</option>
               ))}
             </select>
+            {courses.length === 0 && (
+              <p className="mb-4 text-xs text-notion-muted">No courses in the catalog yet. Upload them on the Courses page first, then upload registered courses here.</p>
+            )}
             <div className="flex justify-end gap-2">
               <button onClick={() => setAssignModalOpen(false)} className="n-btn-secondary">Cancel</button>
               <button onClick={handleAssign} disabled={assigning || !selectedCourse} className="n-btn">
@@ -313,7 +321,7 @@ const AdminStudentDetail = () => {
             <form onSubmit={handleEditSave} className="space-y-3">
               <div className="flex flex-wrap items-center gap-2 rounded-notion border border-dashed border-notion-border bg-notion-surface p-3">
                 <ScanLine size={16} className="text-notion-muted" />
-                <span className="text-sm text-notion-muted">Autofill from CNIC image</span>
+                <span className="text-sm text-notion-muted">Upload a CNIC photo to fill name, father, number, date of birth, gender, and address</span>
                 <label className="n-btn-secondary cursor-pointer text-xs">
                   {ocrLoading ? <Loader2 size={14} className="animate-spin" /> : 'Upload CNIC'}
                   <input type="file" accept="image/jpeg,image/png,image/webp" className="hidden" disabled={ocrLoading} onChange={handleCnicUpload} />
@@ -354,6 +362,7 @@ const AdminStudentDetail = () => {
           onClose={() => setImportOpen(false)}
           onDone={(result) => {
             setImportOpen(false);
+            setAssignModalOpen(false);
             say({ title: 'Import finished', body: `Added ${result.created || 0}. Skipped ${result.skipped || 0}.`, action: 'OK' });
             loadAssignments();
           }}

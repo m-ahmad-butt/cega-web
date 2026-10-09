@@ -159,40 +159,52 @@ const StudentDashboard = () => {
       <div className="mx-auto max-w-5xl px-4 py-8 sm:px-6">
         <h1 className="mb-6 text-2xl font-bold tracking-tight">Dashboard</h1>
 
-        {/* Profile info */}
-        <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4 mb-8">
-          <div className="n-card p-4">
-            <h3 className="text-xs font-semibold uppercase tracking-wide text-notion-muted mb-2">Personal</h3>
-            <p className="text-sm font-medium">{profile.fullName}</p>
-            <p className="text-xs text-notion-muted">{profile.email}</p>
-            <p className="text-xs text-notion-muted">{profile.phone || '—'}</p>
-          </div>
-          <div className="n-card p-4">
-            <h3 className="text-xs font-semibold uppercase tracking-wide text-notion-muted mb-2">Parent</h3>
-            <p className="text-sm font-medium">{profile.fatherName || '—'}</p>
-            <p className="text-xs text-notion-muted">{profile.parentContact || '—'}</p>
-          </div>
-          <div className="n-card p-4">
-            <h3 className="text-xs font-semibold uppercase tracking-wide text-notion-muted mb-2">Academic</h3>
-            <p className="text-sm font-medium">{profile.registrationNumber}</p>
-            <p className="text-xs text-notion-muted">{profile.program} · Sem {profile.semester}</p>
-          </div>
-          <div className="n-card p-4">
-            <h3 className="text-xs font-semibold uppercase tracking-wide text-notion-muted mb-2">Branch</h3>
-            <p className="text-sm font-medium">{profile.branch?.name || '—'}</p>
-            <p className="text-xs text-notion-muted">{profile.branch?.city || ''}</p>
-          </div>
+        <div className="mb-8 grid grid-cols-1 gap-4 sm:grid-cols-2">
+          {[
+            ['Personal', [
+              ['Name', profile.fullName],
+              ['Email', profile.email],
+              ['Phone', profile.phone],
+            ]],
+            ['Parent', [
+              ['Father', profile.fatherName],
+              ['Contact', profile.parentContact],
+            ]],
+            ['Academic', [
+              ['Roll', profile.registrationNumber],
+              ['Program', profile.program],
+              ['Semester', profile.semester],
+            ]],
+            ['Branch', [
+              ['Name', profile.branch?.name],
+              ['City', profile.branch?.city],
+            ]],
+          ].map(([title, rows]) => (
+            <div key={title} className="n-card min-w-0 p-4">
+              <h3 className="mb-3 text-xs font-semibold uppercase tracking-wide text-notion-muted">{title}</h3>
+              <dl className="space-y-2">
+                {rows.map(([label, value]) => (
+                  <div key={label} className="min-w-0">
+                    <dt className="text-[11px] text-notion-muted">{label}</dt>
+                    <dd className={`break-words text-sm ${value ? 'font-medium' : 'text-notion-muted'}`}>{value || 'Not set'}</dd>
+                  </div>
+                ))}
+              </dl>
+            </div>
+          ))}
         </div>
 
         <div className="mb-8">
           <div className="mb-3 flex flex-wrap items-center justify-between gap-2">
             <h2 className="text-lg font-semibold">Registered courses</h2>
-            <button type="button" onClick={downloadCourses} disabled={!courses.length} className="n-btn-secondary">
-              <Download size={16} /> Download CSV
-            </button>
+            {courses.length > 0 && (
+              <button type="button" onClick={downloadCourses} className="n-btn-secondary">
+                <Download size={16} /> Download CSV
+              </button>
+            )}
           </div>
           {courses.length === 0 ? (
-            <div className="n-card p-6 text-sm text-notion-muted">No courses are registered yet.</div>
+            <div className="n-card p-6 text-sm text-notion-muted">No courses are registered yet. An admin assigns them before exam slots appear here.</div>
           ) : (
             <div className="n-card overflow-hidden">
               <table className="w-full">
@@ -227,7 +239,7 @@ const StudentDashboard = () => {
             <p className="text-sm text-notion-muted mb-4">Your exam schedule is confirmed. Open it to download the PDF.</p>
             <Link to="/student/datesheet" className="n-btn"><CalendarDays size={16} /> View Date Sheet</Link>
           </div>
-        ) : (
+        ) : courses.length === 0 ? null : (
           <div>
             <div className="mb-4 flex flex-wrap items-center justify-between gap-2">
               <h2 className="text-lg font-semibold">Select Exam Slots</h2>
@@ -239,12 +251,7 @@ const StudentDashboard = () => {
               </div>
             </div>
 
-            {courses.length === 0 ? (
-              <div className="n-card p-12 text-center text-sm text-notion-muted">
-                No courses assigned yet. Please contact your admin.
-              </div>
-            ) : (
-              <>
+            <>
                 {hasConflicts && (
                   <div className="mb-4 flex items-center gap-2 rounded-notion bg-notion-red-soft p-3 text-sm text-notion-red">
                     <AlertTriangle size={16} /> Some selected slots have time conflicts. Please resolve them.
@@ -342,8 +349,7 @@ const StudentDashboard = () => {
                     )}
                   </button>
                 </div>
-              </>
-            )}
+            </>
           </div>
         )}
       </div>
