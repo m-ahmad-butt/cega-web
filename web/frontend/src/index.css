@@ -1,0 +1,203 @@
+@import url("https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap");
+
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+:root {
+  --notion-bg: #ffffff;
+  --notion-surface: #f7f7f5;
+  --notion-hover: #efefed;
+  --notion-border: #e9e9e7;
+  --notion-text: #37352f;
+  --notion-muted: #787774;
+  --notion-blue: #37352f;
+  --notion-blue-soft: #efefed;
+}
+
+@layer base {
+  html {
+    color-scheme: light;
+  }
+
+  body {
+    font-family: Inter, ui-sans-serif, system-ui, -apple-system, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+    background-color: var(--notion-bg);
+    color: var(--notion-text);
+    -webkit-font-smoothing: antialiased;
+    -moz-osx-font-smoothing: grayscale;
+    letter-spacing: -0.011em;
+  }
+
+  ::selection {
+    background: #e8e7e4;
+    color: var(--notion-text);
+  }
+}
+
+*::-webkit-scrollbar {
+  width: 0;
+  height: 0;
+  display: none;
+}
+
+* {
+  scrollbar-width: none;
+  -ms-overflow-style: none;
+}
+
+@layer components {
+  .n-page {
+    @apply min-h-screen bg-notion-bg text-notion-text font-sans selection:bg-notion-blue-soft;
+  }
+
+  .n-card {
+    @apply bg-white border border-notion-border rounded-notion-lg shadow-notion;
+  }
+
+  .n-surface {
+    @apply bg-notion-surface border border-notion-border rounded-notion-lg;
+  }
+
+  .n-btn {
+    @apply inline-flex items-center justify-center gap-2 rounded-notion bg-notion-text px-4 py-2 text-sm font-semibold text-white transition-colors hover:bg-black disabled:opacity-50;
+  }
+
+  .n-btn-secondary {
+    @apply inline-flex items-center justify-center gap-2 rounded-notion bg-notion-surface px-4 py-2 text-sm font-semibold text-notion-text transition-colors hover:bg-notion-hover disabled:opacity-50;
+  }
+
+  .n-btn-ghost {
+    @apply inline-flex items-center justify-center gap-2 rounded-notion bg-transparent px-4 py-2 text-sm font-medium text-notion-text transition-colors hover:bg-notion-hover disabled:opacity-50;
+  }
+
+  .n-btn-danger {
+    @apply inline-flex items-center justify-center gap-2 rounded-notion bg-notion-red-soft px-4 py-2 text-sm font-semibold text-notion-red transition-colors hover:brightness-95 disabled:opacity-50;
+  }
+
+  .n-input {
+    @apply w-full rounded-notion border border-notion-border bg-white px-3.5 py-2.5 text-sm text-notion-text placeholder-notion-faint outline-none transition-colors focus:border-notion-text focus:ring-2 focus:ring-notion-text/10;
+  }
+
+  .n-label {
+    @apply mb-1.5 block text-sm font-medium text-notion-text;
+  }
+
+  .n-nav {
+    @apply sticky top-0 z-50 border-b border-notion-border bg-white/90 backdrop-blur-md;
+  }
+
+  .n-chip {
+    @apply inline-flex items-center gap-1.5 rounded-full bg-notion-green-soft px-2.5 py-0.5 text-xs font-medium text-notion-green;
+  }
+
+  .n-tag {
+    @apply inline-flex items-center rounded-[4px] px-1.5 py-0.5 text-xs font-medium;
+  }
+
+  .n-th {
+    @apply px-4 py-2.5 text-left text-xs font-semibold uppercase tracking-wide text-notion-muted;
+  }
+
+  .n-td {
+    @apply border-t border-notion-border px-4 py-3 text-sm text-notion-text;
+  }
+}
+
+@layer utilities {
+  .animate-in {
+    animation-duration: 0.7s;
+    animation-fill-mode: both;
+  }
+
+  .fade-in {
+    animation-name: fadeIn;
+  }
+
+  .slide-in-from-bottom-2 {
+    animation-name: slideInBottom2;
+  }
+
+  .slide-in-from-bottom-4 {
+    animation-name: slideInBottom4;
+  }
+
+  .slide-in-from-bottom-6 {
+    animation-name: slideInBottom6;
+  }
+
+  .slide-in-from-bottom-8 {
+    animation-name: slideInBottom8;
+  }
+
+  .slide-in-from-right-12 {
+    animation-name: slideInRight12;
+  }
+
+  .slide-in-from-left-8 {
+    animation-name: slideInLeft8;
+  }
+}
+
+@keyframes fadeIn {
+  from { opacity: 0; }
+  to { opacity: 1; }
+}
+
+@keyframes slideInBottom2 {
+  from { transform: translateY(0.5rem); opacity: 0; }
+  to { transform: translateY(0); opacity: 1; }
+}
+
+@keyframes slideInBottom4 {
+  from { transform: translateY(1rem); opacity: 0; }
+  to { transform: translateY(0); opacity: 1; }
+}
+
+@keyframes slideInBottom6 {
+  from { transform: translateY(1.5rem); opacity: 0; }
+  to { transform: translateY(0); opacity: 1; }
+}
+
+@keyframes slideInBottom8 {
+  from { transform: translateY(2rem); opacity: 0; }
+  to { transform: translateY(0); opacity: 1; }
+}
+
+@keyframes slideInRight12 {
+  from { transform: translateX(3rem); opacity: 0; }
+  to { transform: translateX(0); opacity: 1; }
+}
+
+@keyframes slideInLeft8 {
+  from { transform: translateX(-2rem); opacity: 0; }
+  to { transform: translateX(0); opacity: 1; }
+}
+
+@keyframes nocap-float {
+  0%, 100% { transform: translateY(0) rotate(var(--tilt, 0deg)); }
+  50% { transform: translateY(-8px) rotate(var(--tilt, 0deg)); }
+}
+
+.float-sticker {
+  animation: nocap-float 5.5s ease-in-out infinite;
+}
+
+@keyframes guide-slide {
+  from { transform: translateX(110%); opacity: 0; }
+  to { transform: translateX(0); opacity: 1; }
+}
+
+.guide-slide {
+  animation: guide-slide 0.55s cubic-bezier(0.16, 1, 0.3, 1) both;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .guide-slide { animation: none; }
+}
+
+@media print {
+  .no-print { display: none !important; }
+  body { background: white; }
+  .n-card { box-shadow: none; border: 1px solid #ddd; }
+}

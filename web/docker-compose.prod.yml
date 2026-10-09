@@ -1,0 +1,128 @@
+# PRODUCTION stack — no hot reload, built nginx frontend
+# Usage: docker compose -f docker-compose.prod.yml --env-file frontend/.env --env-file backend/.env up -d --build
+
+services:
+  mongodb:
+    image: mongo:7
+    container_name: authdb-mongodb
+    ports:
+      - "27017:27017"
+    environment:
+      - MONGO_INITDB_DATABASE=authdb
+    volumes:
+      - authdb-mongodb-data:/data/db
+    networks:
+      - hackathon-network
+    healthcheck:
+      test: ["CMD-SHELL", "mongosh --quiet --eval \"quit(db.runCommand({ ping: 1 }).ok ? 0 : 2)\" || exit 1"]
+      interval: 5s
+      timeout: 10s
+      retries: 20
+      start_period: 60s
+    restart: unless-stopped
+
+  mongo-express:
+    image: mongo-express:latest
+    container_name: authdb-mongo-express
+    ports:
+      - "8081:8081"
+    environment:
+      - ME_CONFIG_MONGODB_URL=mongodb://mongodb:27017/
+      - ME_CONFIG_BASICAUTH=false
+    depends_on:
+      mongodb:
+        condition: service_healthy
+    networks:
+      - hackathon-network
+    restart: unless-stopped
+
+  redis:
+    image: redis/redis-stack:latest
+    container_name: hackathon-redis
+    ports:
+      - "6379:6379"
+      - "8001:8001"
+    environment:
+      REDIS_ARGS: "--requirepass ${REDIS_PASSWORD:-123123123}"
+    volumes:
+      - redis-data:/data
+    networks:
+      - hackathon-network
+    healthcheck:
+      test: ["CMD", "redis-cli", "-a", "123123123", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    restart: unless-stopped
+
+  rabbitmq:
+    image: rabbitmq:3-management-alpine
+    container_name: hackathon-rabbitmq
+    ports:
+      - "5672:5672"
+      - "15672:15672"
+    environment:
+      RABBITMQ_DEFAULT_USER: ${RABBITMQ_USER:-admin123}
+      RABBITMQ_DEFAULT_PASS: ${RABBITMQ_PASSWORD:-123123123}
+      RABBITMQ_DEFAULT_VHOST: ${RABBITMQ_VHOST:-hackathon}
+    volumes:
+      - rabbitmq-data:/var/lib/rabbitmq
+    networks:
+      - hackathon-network
+    healthcheck:
+      test: ["CMD", "rabbitmq-diagnostics", "-q", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 30s
+    restart: unless-stopped
+
+  backend:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
+    image: hackathon-backend:prod
+    container_name: hackathon-backend
+    ports:
+      # Localhost only — host nginx (init TLS) proxies public 443 → here
+      - "127.0.0.1:3001:3001"
+    env_file:
+      - ./backend/.env
+    environment:
+      NODE_ENV: production
+    networks:
+      - hackathon-network
+    depends_on:
+      mongodb:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+      rabbitmq:
+        condition: service_healthy
+    restart: unless-stopped
+
+  frontend:
+    build:
+      context: ./frontend
+      dockerfile: Dockerfile
+      args:
+        VITE_API_URL: ${VITE_API_URL}
+    image: hackathon-frontend:prod
+    container_name: hackathon-frontend
+    ports:
+      # Localhost only — host nginx owns public :80/:443
+      - "127.0.0.1:8080:80"
+    networks:
+      - hackathon-network
+    depends_on:
+      - backend
+    restart: unless-stopped
+
+networks:
+  hackathon-network:
+    driver: bridge
+
+volumes:
+  authdb-mongodb-data:
+  redis-data:
+  rabbitmq-data:

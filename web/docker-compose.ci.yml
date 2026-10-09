@@ -1,0 +1,47 @@
+# CI overrides for the shell runner: lighter Redis, unique container names,
+# and no host ports (avoids clashing with /opt/web-comp production).
+# `!reset []` is required — plain `ports: []` does NOT clear base compose ports.
+services:
+  mongodb:
+    image: mongo:7
+    container_name: ci-mongodb
+    ports: !reset []
+    healthcheck:
+      # mongosh exit codes are flaky on mongo:latest; force 0/1 from ping.ok
+      test: ["CMD-SHELL", "mongosh --quiet --eval \"quit(db.runCommand({ ping: 1 }).ok ? 0 : 2)\" || exit 1"]
+      interval: 5s
+      timeout: 10s
+      retries: 20
+      start_period: 60s
+
+  redis:
+    image: redis:7-alpine
+    container_name: ci-redis
+    ports: !reset []
+    environment: !reset {}
+    command: ["redis-server", "--requirepass", "123123123"]
+    volumes:
+      - ci-redis-data:/data
+    healthcheck:
+      test: ["CMD-SHELL", "redis-cli -a 123123123 ping | grep -q PONG"]
+      interval: 5s
+      timeout: 3s
+      retries: 12
+      start_period: 10s
+
+  rabbitmq:
+    container_name: ci-rabbitmq
+    ports: !reset []
+    healthcheck:
+      test: ["CMD", "rabbitmq-diagnostics", "-q", "ping"]
+      interval: 5s
+      timeout: 5s
+      retries: 12
+      start_period: 40s
+
+  backend:
+    container_name: ci-backend
+    ports: !reset []
+
+volumes:
+  ci-redis-data:

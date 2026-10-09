@@ -1,0 +1,16 @@
+# Keep secrets out of the image; compose injects backend/.env at runtime via env_file.
+node_modules
+npm-debug.log
+.env
+.env.*
+keys
+.git
+.gitignore
+README.md
+.vscode
+.idea
+*.log
+coverage
+.nyc_output
+dist
+build

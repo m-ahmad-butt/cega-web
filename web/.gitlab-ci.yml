@@ -1,0 +1,306 @@
+# Blue (staging) + Green (production)
+#
+# Runner tags (shell executor on each EC2):
+#   web-staging     → blue  / staging
+#   web-production  → green / production
+#
+# CI/CD File variables:
+#   BACKEND_ENV / FRONTEND_ENV                 → production (required)
+#   BACKEND_ENV_STAGING / FRONTEND_ENV_STAGING → staging (optional; falls back)
+#
+# Optional variables:
+#   DOMAIN           → web-comp.duckdns.org
+#   STAGING_DOMAIN   → web-comp-stage.duckdns.org
+#   CERTBOT_EMAIL    → required for init TLS
+#   DUCKDNS_TOKEN    → optional DuckDNS refresh
+#
+# Flow on staging runner: build → test → deploy:staging
+# Flow on production runner: deploy:production (after staging)
+# init/restart = compose bring-up only (nginx/TLS is manual — see aws.md)
+
+workflow:
+  rules:
+    - if: $CI_COMMIT_BRANCH == "main"
+    - if: $CI_PIPELINE_SOURCE == "merge_request_event"
+
+stages:
+  - build
+  - test
+  - staging
+  - production
+  - init
+  - restart
+
+variables:
+  COMPOSE_FILE: "docker-compose.prod.yml"
+  COMPOSE_CI_FILE: "docker-compose.ci.yml"
+  COMPOSE_PROJECT_NAME: "web-comp"
+  DEPLOY_DIR: "/opt/web-comp"
+  DOMAIN: "web-comp.duckdns.org"
+  STAGING_DOMAIN: "web-comp-stage.duckdns.org"
+  FF_USE_FASTZIP: "true"
+
+# ---------------------------------------------------------------------------
+# BUILD — on staging (blue) runner
+# ---------------------------------------------------------------------------
+
+build:backend:
+  stage: build
+  tags:
+    - web-staging
+  script:
+    - chmod +x scripts/ci/*.sh scripts/*.sh 2>/dev/null || true
+    - |
+      if [ -z "${BACKEND_ENV:-}" ] || [ ! -f "${BACKEND_ENV}" ]; then
+        echo "Missing CI variable BACKEND_ENV (Type: File)."
+        exit 1
+      fi
+    - cp "${BACKEND_ENV}" backend/.env
+    - docker compose -f "$COMPOSE_FILE" --env-file backend/.env build backend
+  rules:
+    - if: $CI_COMMIT_BRANCH == "main"
+      when: manual
+    - if: $CI_PIPELINE_SOURCE == "merge_request_event"
+      when: manual
+
+build:frontend:
+  stage: build
+  tags:
+    - web-staging
+  script:
+    - chmod +x scripts/ci/*.sh scripts/*.sh 2>/dev/null || true
+    - |
+      if [ -z "${FRONTEND_ENV:-}" ] || [ ! -f "${FRONTEND_ENV}" ]; then
+        echo "Missing CI variable FRONTEND_ENV (Type: File)."
+        exit 1
+      fi
+    - cp "${FRONTEND_ENV}" frontend/.env
+    - docker compose -f "$COMPOSE_FILE" --env-file frontend/.env build frontend
+  rules:
+    - if: $CI_COMMIT_BRANCH == "main"
+      when: manual
+    - if: $CI_PIPELINE_SOURCE == "merge_request_event"
+      when: manual
+
+# ---------------------------------------------------------------------------
+# TEST — on staging (blue) runner
+# ---------------------------------------------------------------------------
+
+test:unit:
+  stage: test
+  tags:
+    - web-staging
+  needs:
+    - build:backend
+  variables:
+    COMPOSE_PROJECT_NAME: "web-comp-ci"
+  script:
+    - cp "${BACKEND_ENV}" backend/.env
+    - docker compose -f "$COMPOSE_FILE" -f "$COMPOSE_CI_FILE" --env-file backend/.env run --rm --no-deps backend npm run test:unit
+  rules:
+    - if: $CI_COMMIT_BRANCH == "main"
+      when: manual
+    - if: $CI_PIPELINE_SOURCE == "merge_request_event"
+      when: manual
+
+test:smoke:
+  stage: test
+  tags:
+    - web-staging
+  needs:
+    - build:backend
+  variables:
+    COMPOSE_PROJECT_NAME: "web-comp-ci"
+  script:
+    - cp "${BACKEND_ENV}" backend/.env
+    - cp "${FRONTEND_ENV}" frontend/.env
+    - |
+      set -e
+      COMPOSE="docker compose -p web-comp-ci -f $COMPOSE_FILE -f $COMPOSE_CI_FILE --env-file backend/.env --env-file frontend/.env"
+      health() { docker inspect -f '{{if .State.Health}}{{.State.Health.Status}}{{else}}{{.State.Status}}{{end}}' "$1" 2>/dev/null || echo missing; }
+      mongo_ping() { docker exec ci-mongodb mongosh --quiet --eval 'quit(db.runCommand({ ping: 1 }).ok ? 0 : 2)' >/dev/null 2>&1; }
+      redis_ping() { docker exec ci-redis redis-cli -a 123123123 ping 2>/dev/null | grep -q PONG; }
+      rabbit_ping() { docker exec ci-rabbitmq rabbitmq-diagnostics -q ping >/dev/null 2>&1; }
+      $COMPOSE up -d mongodb redis rabbitmq
+      echo "Waiting for mongodb/redis/rabbitmq (ping)..."
+      for i in $(seq 1 60); do
+        mongo_h=$(health ci-mongodb)
+        redis_h=$(health ci-redis)
+        rabbit_h=$(health ci-rabbitmq)
+        mongo_ok=0; redis_ok=0; rabbit_ok=0
+        mongo_ping && mongo_ok=1
+        redis_ping && redis_ok=1
+        rabbit_ping && rabbit_ok=1
+        echo "  [$i] mongo=$mongo_h/ping=$mongo_ok redis=$redis_h/ping=$redis_ok rabbitmq=$rabbit_h/ping=$rabbit_ok"
+        if [ "$mongo_ok" = "1" ] && [ "$redis_ok" = "1" ] && [ "$rabbit_ok" = "1" ]; then
+          echo "Dependencies ready"
+          break
+        fi
+        if [ "$i" -eq 60 ]; then
+          echo "Dependencies failed readiness checks"
+          $COMPOSE ps
+          docker logs --tail=100 ci-mongodb || true
+          docker logs --tail=50 ci-redis || true
+          docker logs --tail=50 ci-rabbitmq || true
+          exit 1
+        fi
+        sleep 2
+      done
+      $COMPOSE up -d backend
+      echo "Waiting for backend /health (in-network)..."
+      for i in $(seq 1 60); do
+        if $COMPOSE exec -T backend node -e "require('http').get('http://127.0.0.1:3001/health',r=>{let d='';r.on('data',c=>d+=c);r.on('end',()=>process.exit(r.statusCode===200?0:1))}).on('error',()=>process.exit(1))"; then
+          echo "Backend is healthy"
+          break
+        fi
+        sleep 2
+        if [ "$i" -eq 60 ]; then
+          echo "Backend health check failed"
+          docker logs --tail=120 ci-backend || true
+          exit 1
+        fi
+      done
+      $COMPOSE run --rm --no-deps -e SMOKE_BASE_URL=http://backend:3001 backend npm run test:smoke
+  after_script:
+    - docker compose -p web-comp-ci -f "$COMPOSE_FILE" -f "$COMPOSE_CI_FILE" --env-file backend/.env --env-file frontend/.env down --remove-orphans -v || true
+  rules:
+    - if: $CI_COMMIT_BRANCH == "main"
+      when: manual
+    - if: $CI_PIPELINE_SOURCE == "merge_request_event"
+      when: manual
+
+# ---------------------------------------------------------------------------
+# STAGING (blue)
+# ---------------------------------------------------------------------------
+
+deploy:staging:
+  stage: staging
+  tags:
+    - web-staging
+  needs:
+    - test:unit
+    - test:smoke
+  variables:
+    APP_ENV: "staging"
+    DOMAIN: $STAGING_DOMAIN
+    COMPOSE_PROJECT_NAME: "web-comp-stage"
+    DEPLOY_DIR: "/opt/web-comp-stage"
+  environment:
+    name: staging
+    url: https://web-comp-stage.duckdns.org
+  script:
+    - chmod +x scripts/ci/*.sh scripts/*.sh 2>/dev/null || true
+    - bash scripts/ci/deploy.sh
+  rules:
+    - if: $CI_COMMIT_BRANCH == "main"
+      when: manual
+
+# ---------------------------------------------------------------------------
+# PRODUCTION (green)
+# ---------------------------------------------------------------------------
+
+deploy:production:
+  stage: production
+  tags:
+    - web-production
+  needs:
+    - deploy:staging
+  variables:
+    APP_ENV: "production"
+    COMPOSE_PROJECT_NAME: "web-comp"
+    DEPLOY_DIR: "/opt/web-comp"
+  environment:
+    name: production
+    url: https://web-comp.duckdns.org
+  script:
+    - chmod +x scripts/ci/*.sh scripts/*.sh 2>/dev/null || true
+    - bash scripts/ci/deploy.sh
+  rules:
+    - if: $CI_COMMIT_BRANCH == "main"
+      when: manual
+
+# ---------------------------------------------------------------------------
+# INIT — nginx + DuckDNS TLS (once per environment)
+# ---------------------------------------------------------------------------
+
+init:staging:
+  stage: init
+  tags:
+    - web-staging
+  needs: []
+  variables:
+    APP_ENV: "staging"
+    DOMAIN: $STAGING_DOMAIN
+    COMPOSE_PROJECT_NAME: "web-comp-stage"
+    DEPLOY_DIR: "/opt/web-comp-stage"
+  environment:
+    name: staging
+    url: https://web-comp-stage.duckdns.org
+  script:
+    - chmod +x scripts/ci/*.sh scripts/*.sh 2>/dev/null || true
+    - bash scripts/ci/init.sh
+  rules:
+    - if: $CI_COMMIT_BRANCH == "main"
+      when: manual
+
+init:production:
+  stage: init
+  tags:
+    - web-production
+  needs: []
+  variables:
+    APP_ENV: "production"
+    COMPOSE_PROJECT_NAME: "web-comp"
+    DEPLOY_DIR: "/opt/web-comp"
+  environment:
+    name: production
+    url: https://web-comp.duckdns.org
+  script:
+    - chmod +x scripts/ci/*.sh scripts/*.sh 2>/dev/null || true
+    - bash scripts/ci/init.sh
+  rules:
+    - if: $CI_COMMIT_BRANCH == "main"
+      when: manual
+
+# ---------------------------------------------------------------------------
+# RESTART — redeploy compose stack without TLS setup
+# ---------------------------------------------------------------------------
+
+restart:staging:
+  stage: restart
+  tags:
+    - web-staging
+  needs: []
+  variables:
+    APP_ENV: "staging"
+    DOMAIN: $STAGING_DOMAIN
+    COMPOSE_PROJECT_NAME: "web-comp-stage"
+    DEPLOY_DIR: "/opt/web-comp-stage"
+  environment:
+    name: staging
+    url: https://web-comp-stage.duckdns.org
+  script:
+    - chmod +x scripts/ci/*.sh scripts/*.sh 2>/dev/null || true
+    - bash scripts/ci/restart.sh
+  rules:
+    - if: $CI_COMMIT_BRANCH == "main"
+      when: manual
+
+restart:production:
+  stage: restart
+  tags:
+    - web-production
+  needs: []
+  variables:
+    APP_ENV: "production"
+    COMPOSE_PROJECT_NAME: "web-comp"
+    DEPLOY_DIR: "/opt/web-comp"
+  environment:
+    name: production
+    url: https://web-comp.duckdns.org
+  script:
+    - chmod +x scripts/ci/*.sh scripts/*.sh 2>/dev/null || true
+    - bash scripts/ci/restart.sh
+  rules:
+    - if: $CI_COMMIT_BRANCH == "main"
+      when: manual
