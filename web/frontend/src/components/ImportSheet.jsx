@@ -35,7 +35,10 @@ const ImportSheet = ({ kind, onClose, onDone }) => {
 
   const confirm = async () => {
     const ready = (rows || []).filter((row) => row.ok);
-    if (!ready.length) return warn('Nothing valid to add');
+    if (!ready.length) {
+      const reason = (rows || []).find((row) => row.message)?.message;
+      return warn(reason || 'Nothing valid to add');
+    }
     setSaving(true);
     try {
       const { data } = await adminAPI.commitImport(kind, { rows: ready });
