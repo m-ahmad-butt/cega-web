@@ -48,6 +48,8 @@ const userSchema = new Schema(
     selectedBranch: { type: Schema.Types.ObjectId, ref: 'Branch', default: null },
     branchLocked: { type: Boolean, default: false },
     dateSheetSaved: { type: Boolean, default: false },
+    passwordSent: { type: Boolean, default: false },
+    pendingPassword: { type: String, default: null, select: false },
     // Password setup
     passwordSetupToken: { type: String, default: null },
     passwordSetupExpiry: { type: Date, default: null },

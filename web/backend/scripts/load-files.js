@@ -94,12 +94,20 @@ const run = async () => {
   for (const row of parseCsv('students.csv')) {
     const email = (row.email || '').toLowerCase();
     if (!row.name || !email.includes('@') || email.endsWith('@') || !row.roll) continue;
+    const branchCode = (row.branch || '').toUpperCase();
+    const branch = branchCode
+      ? await Branch.findOne({ $or: [{ code: branchCode }, { name: row.branch }] })
+      : null;
     await User.create({
       email,
       fullName: row.name,
       registrationNumber: row.roll,
       program: row.discipline,
+      semester: row.semester,
+      selectedBranch: branch ? branch._id : null,
       password,
+      pendingPassword: 'demo',
+      passwordSent: false,
       role: 'STUDENT',
       isVerified: true,
     });

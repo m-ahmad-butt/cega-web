@@ -6,7 +6,7 @@ import { Upload, X, Loader2 } from 'lucide-react';
 const HINTS = {
   branches: 'Columns: name, code, city, address, contact, status',
   courses: 'Columns: code, title, credit hours, department, status',
-  students: 'Columns: name, roll, discipline, email, password',
+  students: 'Columns: name, roll, discipline, email, password, semester, branch',
   slots: 'Columns: course code, date, start time, end time, capacity',
 };
 
@@ -33,14 +33,6 @@ const ImportSheet = ({ kind, onClose, onDone }) => {
     }
   };
 
-  const setSend = (index, value) => {
-    setRows((current) => current.map((row) => (row.index === index ? { ...row, sendEmail: value } : row)));
-  };
-
-  const sendAll = (value) => {
-    setRows((current) => current.map((row) => (row.ok ? { ...row, sendEmail: value } : row)));
-  };
-
   const confirm = async () => {
     const ready = (rows || []).filter((row) => row.ok);
     if (!ready.length) return warn('Nothing valid to add');
@@ -56,7 +48,7 @@ const ImportSheet = ({ kind, onClose, onDone }) => {
   };
 
   const headers = kind === 'students'
-    ? ['Name', 'Roll', 'Discipline', 'Email', 'Password']
+    ? ['Name', 'Roll', 'Discipline', 'Email', 'Password', 'Semester', 'Branch']
     : kind === 'branches'
       ? ['Name', 'Code', 'City', 'Status']
       : kind === 'courses'
@@ -64,7 +56,7 @@ const ImportSheet = ({ kind, onClose, onDone }) => {
         : ['Course', 'Date', 'Start', 'End', 'Capacity'];
 
   const cells = (row) => {
-    if (kind === 'students') return [row.fullName, row.registrationNumber, row.program, row.email, row.password];
+    if (kind === 'students') return [row.fullName, row.registrationNumber, row.program, row.email, row.password, row.semester, row.branchName || row.branch];
     if (kind === 'branches') return [row.name, row.code, row.city, row.status];
     if (kind === 'courses') return [row.courseCode, row.title, row.creditHours, row.department, row.difficulty];
     return [row.courseCode, row.date, row.startTime, row.endTime, row.capacity];
@@ -89,45 +81,26 @@ const ImportSheet = ({ kind, onClose, onDone }) => {
               <input type="file" accept=".csv,.xlsx,.xls,text/csv,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet" className="hidden" onChange={onFile} />
             </label>
           ) : (
-            <>
-              {kind === 'students' && (
-                <div className="mb-3 flex items-center justify-between gap-3">
-                  <p className="text-xs text-notion-muted">Tick a row to email that password, or send them all.</p>
-                  <button type="button" onClick={() => sendAll(true)} className="n-btn-secondary py-1.5 text-xs">Send all</button>
-                </div>
-              )}
-              <div className="overflow-x-auto">
-                <table className="w-full min-w-[640px]">
-                  <thead>
-                    <tr className="bg-notion-surface">
-                      {headers.map((header) => <th key={header} className="n-th">{header}</th>)}
-                      {kind === 'students' && <th className="n-th">Email password</th>}
-                      <th className="n-th">Check</th>
+            <div className="overflow-x-auto">
+              <table className="w-full min-w-[640px]">
+                <thead>
+                  <tr className="bg-notion-surface">
+                    {headers.map((header) => <th key={header} className="n-th">{header}</th>)}
+                    <th className="n-th">Check</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {rows.map((row) => (
+                    <tr key={row.index}>
+                      {cells(row).map((value, i) => <td key={i} className="n-td">{value || 'Not set'}</td>)}
+                      <td className={`n-td text-xs ${row.ok ? 'text-notion-green' : 'text-notion-red'}`}>
+                        {row.ok ? 'Ready' : row.message}
+                      </td>
                     </tr>
-                  </thead>
-                  <tbody>
-                    {rows.map((row) => (
-                      <tr key={row.index}>
-                        {cells(row).map((value, i) => <td key={i} className="n-td">{value || '—'}</td>)}
-                        {kind === 'students' && (
-                          <td className="n-td">
-                            <input
-                              type="checkbox"
-                              checked={!!row.sendEmail}
-                              disabled={!row.ok}
-                              onChange={(e) => setSend(row.index, e.target.checked)}
-                            />
-                          </td>
-                        )}
-                        <td className={`n-td text-xs ${row.ok ? 'text-notion-green' : 'text-notion-red'}`}>
-                          {row.ok ? 'Ready' : row.message}
-                        </td>
-                      </tr>
-                    ))}
-                  </tbody>
-                </table>
-              </div>
-            </>
+                  ))}
+                </tbody>
+              </table>
+            </div>
           )}
         </div>
 

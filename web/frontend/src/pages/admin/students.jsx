@@ -5,7 +5,7 @@ import Pagination from '../../components/Pagination';
 import ConfirmModal from '../../components/ConfirmModal';
 import { adminAPI } from '../../utils/api';
 import { useGuide, useWarn } from '../../components/GuideModal';
-import { Plus, Trash2, Search, X, Loader2, Eye, ScanLine, Upload, KeyRound } from 'lucide-react';
+import { Plus, Trash2, Search, X, Loader2, Eye, ScanLine, Upload, KeyRound, Mail } from 'lucide-react';
 import ImportSheet from '../../components/ImportSheet';
 
 const emptyPersonal = { fullName: '', email: '', phone: '', cnic: '', dob: '', gender: '', address: '' };
@@ -74,20 +74,19 @@ const AdminStudents = () => {
     }
   };
 
-  const handleReset = async (student) => {
+  const deliverPasswords = async (ids) => {
     try {
-      const { data } = await adminAPI.resetStudentPassword(student.id || student._id);
-      const password = data.data?.password;
-      const emailed = data.data?.emailed;
+      const { data } = await adminAPI.sendStudentPasswords(ids ? { ids } : {});
+      const sent = data.data?.sent || 0;
+      const reset = data.data?.reset || 0;
       say({
-        title: 'Password reset',
-        body: emailed
-          ? `Emailed to ${student.email}. New password: ${password}`
-          : `Email failed. New password: ${password}`,
+        title: reset && !sent ? 'Passwords reset' : 'Passwords sent',
+        body: data.message || 'Done',
         action: 'OK',
       });
+      load();
     } catch (err) {
-      warn(err.response?.data?.message || 'Could not reset password');
+      warn(err.response?.data?.message || 'Could not email passwords');
     }
   };
 
@@ -146,6 +145,7 @@ const AdminStudents = () => {
         <div className="mb-6 flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
           <h1 className="text-2xl font-bold tracking-tight">Students</h1>
           <div className="flex flex-wrap gap-2">
+            <button onClick={() => deliverPasswords()} className="n-btn-secondary"><Mail size={16} /> Send all</button>
             <button onClick={() => setImportOpen(true)} className="n-btn-secondary"><Upload size={16} /> Upload</button>
             <button onClick={openAdd} className="n-btn"><Plus size={16} /> Add Student</button>
           </div>
@@ -176,15 +176,15 @@ const AdminStudents = () => {
                       <td className="n-td">{s.fullName}</td>
                       <td className="n-td text-notion-muted">{s.email}</td>
                       <td className="n-td">{s.program}</td>
-                      <td className="n-td">{s.semester}</td>
-                      <td className="n-td">{s.branch?.name || '—'}</td>
+                      <td className="n-td">{s.semester || 'Not set'}</td>
+                      <td className="n-td">{s.branch?.name || 'Not set'}</td>
                       <td className="n-td">
                         <span className={`n-tag ${s.dateSheetSaved ? 'bg-notion-green-soft text-notion-green' : 'bg-notion-yellow-soft text-notion-yellow'}`}>
                           {s.dateSheetSaved ? 'Saved' : 'Pending'}
                         </span>
                       </td>
                       <td className="n-td text-right" onClick={(e) => e.stopPropagation()}>
-                        <button onClick={() => handleReset(s)} className="n-btn-ghost p-1.5" title="Reset password"><KeyRound size={14} /></button>
+                        <button onClick={() => deliverPasswords([s.id || s._id])} className="n-btn-ghost p-1.5" title={s.passwordSent ? 'Reset password' : 'Send password'}><KeyRound size={14} /></button>
                         <button onClick={() => navigate(`/admin/students/${s.id || s._id}`)} className="n-btn-ghost p-1.5"><Eye size={14} /></button>
                         <button onClick={() => setDeleteTarget(s)} className="n-btn-ghost p-1.5 text-notion-red"><Trash2 size={14} /></button>
                       </td>
@@ -204,7 +204,7 @@ const AdminStudents = () => {
                     </span>
                   </div>
                   <p className="text-xs text-notion-muted">{s.registrationNumber} · {s.email}</p>
-                  <p className="text-xs text-notion-muted">{s.program} · Sem {s.semester} · {s.branch?.name || 'No branch'}</p>
+                  <p className="text-xs text-notion-muted">{s.program}, semester {s.semester || 'not set'}, {s.branch?.name || 'no branch'}</p>
                   <div className="mt-3 flex gap-2" onClick={(e) => e.stopPropagation()}>
                     <button onClick={() => setDeleteTarget(s)} className="n-btn-danger py-1 px-2 text-xs"><Trash2 size={12} /> Delete</button>
                   </div>

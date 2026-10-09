@@ -38,6 +38,7 @@ router.delete('/courses/:id', requireAdmin, adminController.deleteCourse);
 // Students
 router.get('/students', requireAdmin, adminController.listStudents);
 router.post('/students/ocr-cnic', requireAdmin, imageUpload.single('cnic'), adminController.ocrCnic);
+router.post('/students/send-passwords', requireAdmin, adminController.deliverStudentPasswords);
 router.post('/students/:id/reset-password', requireAdmin, adminController.resetStudentPassword);
 
 router.post('/import/:kind/preview', requireAdmin, sheetUpload.single('file'), adminController.previewImport);

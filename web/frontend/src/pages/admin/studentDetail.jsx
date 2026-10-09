@@ -26,7 +26,8 @@ const AdminStudentDetail = () => {
   const loadStudent = useCallback(async () => {
     try {
       const { data } = await adminAPI.getStudent(id);
-      setStudent(data.student || data);
+      const student = data.data || data.student || data;
+      setStudent(student && student.fullName ? student : null);
     } catch {
       warn('Failed to load student');
       navigate('/admin/students');
@@ -36,7 +37,8 @@ const AdminStudentDetail = () => {
   const loadAssignments = useCallback(async () => {
     try {
       const { data } = await adminAPI.getStudentAssignments(id);
-      setAssignments(data.assignments || data || []);
+      const rows = data.data || data.assignments || data;
+      setAssignments(Array.isArray(rows) ? rows : []);
     } catch {
       /* ignore */
     }

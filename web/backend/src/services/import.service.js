@@ -1,7 +1,6 @@
 const XLSX = require('xlsx');
 const bcrypt = require('bcryptjs');
 const { User, Branch, Course, ExamSlot } = require('../models');
-const emailService = require('./email.service');
 
 const KINDS = ['branches', 'courses', 'students', 'slots'];
 
@@ -81,9 +80,10 @@ const previewRow = (kind, raw) => {
       fullName: pick(raw, ['name', 'fullname', 'student']),
       registrationNumber: pick(raw, ['roll', 'rollno', 'registrationnumber', 'regno']),
       program: pick(raw, ['discipline', 'program', 'degree']),
+      semester: pick(raw, ['semester', 'sem']),
+      branch: pick(raw, ['branch', 'branchcode', 'centre', 'center']),
       email: pick(raw, ['email', 'mail']).toLowerCase(),
       password: given || makePassword(),
-      sendEmail: false,
     };
     const issues = [];
     if (!row.fullName) issues.push('Name is required');
@@ -109,7 +109,16 @@ const previewRow = (kind, raw) => {
   return { ...row, ok: issues.length === 0, message: issues.join('. ') };
 };
 
-const previewImport = (kind, buffer) => {
+const findBranch = (value) => {
+  const text = String(value || '').trim();
+  if (!text) return null;
+  const safe = text.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+  return Branch.findOne({
+    $or: [{ code: text.toUpperCase() }, { name: new RegExp(`^${safe}$`, 'i') }],
+  });
+};
+
+const previewImport = async (kind, buffer) => {
   if (!KINDS.includes(kind)) {
     const error = new Error('Unknown import type');
     error.status = 400;
@@ -122,6 +131,19 @@ const previewImport = (kind, buffer) => {
     throw error;
   }
   const rows = rawRows.map((raw, index) => ({ index: index + 2, ...previewRow(kind, raw) }));
+  if (kind === 'students') {
+    for (const row of rows) {
+      if (!row.ok || !row.branch) continue;
+      const branch = await findBranch(row.branch);
+      if (!branch) {
+        row.ok = false;
+        row.message = [row.message, `Branch ${row.branch} was not found`].filter(Boolean).join('. ');
+      } else {
+        row.branchName = branch.name;
+        row.branchId = branch._id.toString();
+      }
+    }
+  }
   return { kind, rows, ready: rows.filter((row) => row.ok).length, blocked: rows.filter((row) => !row.ok).length };
 };
 
@@ -135,34 +157,39 @@ const commitStudents = async (rows) => {
     const existing = await User.findOne({
       $or: [{ email: row.email }, { registrationNumber: row.registrationNumber }],
     });
-    if (existing) {
-      results.push({ index: row.index, status: 'skipped', message: 'Email or roll number already exists' });
+    const branch = row.branchId
+      ? await Branch.findById(row.branchId)
+      : await findBranch(row.branch);
+    if (row.branch && !branch) {
+      results.push({ index: row.index, status: 'skipped', message: `Branch ${row.branch} was not found` });
       continue;
     }
+    const fields = {
+      fullName: row.fullName,
+      email: row.email,
+      registrationNumber: row.registrationNumber,
+      program: row.program,
+      semester: row.semester,
+      selectedBranch: branch ? branch._id : null,
+      password: await bcrypt.hash(row.password, 10),
+      pendingPassword: row.password,
+      passwordSent: false,
+      role: 'STUDENT',
+      isVerified: true,
+    };
     try {
-      await User.create({
-        email: row.email,
-        fullName: row.fullName,
-        registrationNumber: row.registrationNumber,
-        program: row.program,
-        password: await bcrypt.hash(row.password, 10),
-        role: 'STUDENT',
-        isVerified: true,
-      });
-      let emailed = false;
-      if (row.sendEmail) {
-        try {
-          await emailService.sendAccountPassword(row.email, row.fullName, row.password, false);
-          emailed = true;
-        } catch (err) {
-          console.error('[Email] Import password email failed:', err.message);
+      if (existing) {
+        if (existing.role === 'ADMIN') {
+          results.push({ index: row.index, status: 'skipped', message: 'That email belongs to an admin' });
+          continue;
         }
+        Object.assign(existing, fields);
+        await existing.save();
+        results.push({ index: row.index, status: 'created', message: 'Updated' });
+        continue;
       }
-      results.push({
-        index: row.index,
-        status: 'created',
-        message: row.sendEmail ? (emailed ? 'Created and emailed' : 'Created. Email failed') : 'Created',
-      });
+      await User.create(fields);
+      results.push({ index: row.index, status: 'created', message: 'Created' });
     } catch (err) {
       results.push({ index: row.index, status: 'skipped', message: err.code === 11000 ? 'Duplicate value' : 'Could not create student' });
     }

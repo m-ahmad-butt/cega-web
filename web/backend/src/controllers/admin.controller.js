@@ -190,8 +190,13 @@ const listStudents = async (req, res) => {
       const regex = new RegExp(search, 'i');
       filter.$or = [{ fullName: regex }, { email: regex }, { registrationNumber: regex }];
     }
-    const result = await paginate(User, filter, { page, pageSize });
-    result.data = result.data.map(({ password, passwordSetupToken, passwordSetupExpiry, ...u }) => u);
+    const result = await paginate(User, filter, { page, pageSize, populate: 'selectedBranch' });
+    result.data = result.data.map(({ password, passwordSetupToken, passwordSetupExpiry, pendingPassword, selectedBranch, ...u }) => ({
+      ...u,
+      branch: selectedBranch
+        ? { id: String(selectedBranch._id || selectedBranch.id), name: selectedBranch.name, code: selectedBranch.code }
+        : null,
+    }));
     res.status(200).json(result);
   } catch (error) {
     console.error('listStudents error:', error);
@@ -668,10 +673,58 @@ const resetStudentPassword = async (req, res) => {
   }
 };
 
+const deliverStudentPasswords = async (req, res) => {
+  try {
+    const ids = Array.isArray(req.body.ids) ? req.body.ids.filter(Boolean) : [];
+    const filter = { role: 'STUDENT' };
+    if (ids.length) filter._id = { $in: ids };
+    const students = await User.find(filter).select('+pendingPassword');
+    let sent = 0;
+    let reset = 0;
+    const failed = [];
+
+    for (const student of students) {
+      const first = !student.passwordSent;
+      const kept = first && student.pendingPassword;
+      const plain = kept ? student.pendingPassword : importService.issueStudentPassword();
+      if (!kept) student.password = await bcrypt.hash(plain, 10);
+      student.pendingPassword = undefined;
+      student.passwordSent = true;
+      student.isVerified = true;
+      student.passwordSetupToken = null;
+      student.passwordSetupExpiry = null;
+      await student.save();
+      try {
+        await emailService.sendAccountPassword(student.email, student.fullName, plain, !first);
+        if (first) sent += 1;
+        else reset += 1;
+      } catch (err) {
+        failed.push({ email: student.email, password: plain });
+        console.error('[Email] Student password email failed:', err.message);
+      }
+    }
+
+    const parts = [];
+    if (sent) parts.push(`Sent ${sent} password${sent === 1 ? '' : 's'}`);
+    if (reset) parts.push(`Reset ${reset} password${reset === 1 ? '' : 's'}`);
+    if (failed.length) {
+      const lines = failed.map((item) => `${item.email}: ${item.password}`).join('. ');
+      parts.push(`Email failed for ${lines}`);
+    }
+    res.status(200).json({
+      message: parts.join('. ') || 'No students to update',
+      data: { sent, reset, failed: failed.length },
+    });
+  } catch (error) {
+    console.error('deliverStudentPasswords error:', error);
+    res.status(500).json({ message: 'Server error' });
+  }
+};
+
 const previewImport = async (req, res) => {
   try {
     if (!req.file) return res.status(400).json({ message: 'Upload a CSV or Excel file' });
-    const data = importService.previewImport(req.params.kind, req.file.buffer);
+    const data = await importService.previewImport(req.params.kind, req.file.buffer);
     res.status(200).json({ data });
   } catch (error) {
     console.error('previewImport error:', error);
@@ -699,6 +752,7 @@ module.exports = {
   getDashboardStats,
   ocrCnic,
   resetStudentPassword,
+  deliverStudentPasswords,
   previewImport,
   commitImport,
 };

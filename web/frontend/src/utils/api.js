@@ -74,6 +74,7 @@ export const adminAPI = {
   updateStudent: (id, data) => api.put(`/api/admin/students/${id}`, data),
   deleteStudent: (id) => api.delete(`/api/admin/students/${id}`),
   resetStudentPassword: (id) => api.post(`/api/admin/students/${id}/reset-password`),
+  sendStudentPasswords: (data) => api.post('/api/admin/students/send-passwords', data || {}),
   previewImport: (kind, formData) =>
     api.post(`/api/admin/import/${kind}/preview`, formData, {
       transformRequest: [(data, headers) => {
