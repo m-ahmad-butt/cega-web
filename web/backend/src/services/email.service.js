@@ -14,7 +14,7 @@ class EmailService {
     });
   }
 
-  getEmailTemplate(content, title = 'ExamSlot') {
+  getEmailTemplate(content, title = 'UnCooked') {
     return `
       <!DOCTYPE html>
       <html lang="en">
@@ -27,7 +27,7 @@ class EmailService {
         <div style="max-width:640px;margin:0 auto;background:#ffffff;border:1px solid #e9e9e7;">
           <div style="background:#37352f;color:#ffffff;padding:22px 28px;">
             <p style="margin:0;font-family:Arial,Helvetica,sans-serif;font-size:11px;letter-spacing:1.4px;">VIRTUAL UNIVERSITY</p>
-            <p style="margin:6px 0 0;font-size:20px;">ExamSlot</p>
+            <p style="margin:6px 0 0;font-size:20px;">UnCooked</p>
           </div>
           <div style="padding:28px;font-family:Arial,Helvetica,sans-serif;font-size:14px;line-height:1.6;color:#37352f;">
             ${content}
@@ -48,13 +48,13 @@ class EmailService {
     const text = [
       `Hi ${displayName},`,
       '',
-      'Your ExamSlot verification code is:',
+      'Your UnCooked verification code is:',
       otp,
       '',
       'This code expires in 10 minutes.',
       'If you did not request this, you can ignore this email.',
       '',
-      `Sent by ExamSlot <${fromAddress}>`,
+      `Sent by UnCooked <${fromAddress}>`,
     ].join('\n');
 
     const html = `
@@ -63,7 +63,7 @@ class EmailService {
       <head><meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1.0"></head>
       <body style="margin:0;padding:24px;background:#ffffff;font-family:Arial,Helvetica,sans-serif;color:#222;">
         <p style="margin:0 0 16px;">Hi ${displayName},</p>
-        <p style="margin:0 0 16px;">Your ExamSlot verification code is:</p>
+        <p style="margin:0 0 16px;">Your UnCooked verification code is:</p>
         <p style="margin:0 0 16px;font-size:28px;font-weight:bold;letter-spacing:6px;">${otp}</p>
         <p style="margin:0 0 16px;">This code expires in 10 minutes.</p>
         <p style="margin:0;color:#666;font-size:13px;">If you did not request this, you can ignore this email.</p>
@@ -72,10 +72,10 @@ class EmailService {
     `;
 
     const mailOptions = {
-      from: `"ExamSlot" <${fromAddress}>`,
+      from: `"UnCooked" <${fromAddress}>`,
       to: email,
       replyTo: fromAddress,
-      subject: `${otp} is your ExamSlot verification code`,
+      subject: `${otp} is your UnCooked verification code`,
       text,
       html,
       headers: { 'X-Entity-Ref-ID': `${Date.now()}` },
@@ -93,7 +93,7 @@ class EmailService {
       
       <div style="background-color: #d1edff; border-left: 4px solid #0066cc; padding: 15px; margin: 20px 0;">
         <p style="color: #004085; margin: 0; line-height: 1.6;">
-          Your ExamSlot account has been created by an administrator. Please click the button below to set up your password and activate your account.
+          Your UnCooked account has been created by an administrator. Please click the button below to set up your password and activate your account.
         </p>
       </div>
 
@@ -113,10 +113,10 @@ class EmailService {
     `;
 
     const mailOptions = {
-      from: `"ExamSlot" <${process.env.EMAIL_USER}>`,
+      from: `"UnCooked" <${process.env.EMAIL_USER}>`,
       to: email,
-      subject: 'Set Up Your ExamSlot Account',
-      html: this.getEmailTemplate(content, 'Set Up Your ExamSlot Account'),
+      subject: 'Set Up Your UnCooked Account',
+      html: this.getEmailTemplate(content, 'Set Up Your UnCooked Account'),
     };
 
     return await this.transporter.sendMail(mailOptions);
@@ -147,7 +147,7 @@ class EmailService {
 
       ${status === 'APPROVED' ? `
         <p style="color: #555; line-height: 1.6;">
-          You can now log in to ExamSlot and make your changes.
+          You can now log in to UnCooked and make your changes.
         </p>
       ` : `
         <p style="color: #555; line-height: 1.6;">
@@ -157,9 +157,9 @@ class EmailService {
     `;
 
     const mailOptions = {
-      from: `"ExamSlot" <${process.env.EMAIL_USER}>`,
+      from: `"UnCooked" <${process.env.EMAIL_USER}>`,
       to: email,
-      subject: `Your ExamSlot Request has been ${status === 'APPROVED' ? 'Approved' : 'Rejected'}`,
+      subject: `Your UnCooked Request has been ${status === 'APPROVED' ? 'Approved' : 'Rejected'}`,
       html: this.getEmailTemplate(content, `Request ${status}`),
     };
 
@@ -172,7 +172,7 @@ class EmailService {
       <p style="color: #555; line-height: 1.6; margin-bottom: 20px;">Dear ${name || 'User'},</p>
       
       <p style="color: #555; line-height: 1.6;">
-        We received a request to reset your ExamSlot password. Click the button below to set a new password.
+        We received a request to reset your UnCooked password. Click the button below to set a new password.
       </p>
 
       <div style="text-align: center; margin: 30px 0;">
@@ -187,9 +187,9 @@ class EmailService {
     `;
 
     const mailOptions = {
-      from: `"ExamSlot" <${process.env.EMAIL_USER}>`,
+      from: `"UnCooked" <${process.env.EMAIL_USER}>`,
       to: email,
-      subject: 'Reset Your ExamSlot Password',
+      subject: 'Reset Your UnCooked Password',
       html: this.getEmailTemplate(content, 'Reset Password'),
     };
 
@@ -198,7 +198,7 @@ class EmailService {
 
   async sendAccountPassword(email, name, password, isReset = false) {
     const loginUrl = `${process.env.FRONTEND_URL || ''}/login`;
-    const title = isReset ? 'Your ExamSlot password was reset' : 'Your ExamSlot login';
+    const title = isReset ? 'Your UnCooked password was reset' : 'Your UnCooked login';
     const content = `
       <h2 style="color: #333; margin-bottom: 20px;">${title}</h2>
       <p style="color: #555; line-height: 1.6;">Dear ${name || 'Student'},</p>
@@ -212,7 +212,7 @@ class EmailService {
       </div>
     `;
     return await this.transporter.sendMail({
-      from: `"ExamSlot" <${process.env.EMAIL_USER}>`,
+      from: `"UnCooked" <${process.env.EMAIL_USER}>`,
       to: email,
       subject: title,
       html: this.getEmailTemplate(content, title),
@@ -255,7 +255,7 @@ class EmailService {
       </table>
     `;
     return this.transporter.sendMail({
-      from: `"ExamSlot" <${process.env.EMAIL_USER}>`,
+      from: `"UnCooked" <${process.env.EMAIL_USER}>`,
       to: email,
       subject: 'Examination date sheet',
       html: this.getEmailTemplate(content, 'Examination date sheet'),
