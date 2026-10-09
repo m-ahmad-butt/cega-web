@@ -1,8 +1,8 @@
 const XLSX = require('xlsx');
 const bcrypt = require('bcryptjs');
-const { User, Branch, Course, ExamSlot } = require('../models');
+const { User, Branch, Course, ExamSlot, CourseAssignment } = require('../models');
 
-const KINDS = ['branches', 'courses', 'students', 'slots'];
+const KINDS = ['branches', 'courses', 'students', 'slots', 'registrations'];
 
 const keyOf = (value) => String(value || '').toLowerCase().replace(/[^a-z0-9]/g, '');
 
@@ -93,6 +93,20 @@ const previewRow = (kind, raw) => {
     return { ...row, ok: issues.length === 0, message: issues.join('. ') };
   }
 
+  if (kind === 'registrations') {
+    const row = {
+      studentName: pick(raw, ['student', 'name', 'fullname']),
+      email: pick(raw, ['email', 'mail']).toLowerCase(),
+      registrationNumber: pick(raw, ['roll', 'rollno', 'registrationnumber', 'regno']),
+      courseCode: pick(raw, ['coursecode', 'code']).toUpperCase(),
+      title: pick(raw, ['title', 'course']),
+    };
+    const issues = [];
+    if (!row.email && !row.registrationNumber) issues.push('Email or roll is required');
+    if (!row.courseCode) issues.push('Course code is required');
+    return { ...row, ok: issues.length === 0, message: issues.join('. ') };
+  }
+
   const row = {
     courseCode: pick(raw, ['coursecode', 'course', 'code']).toUpperCase(),
     date: pick(raw, ['date']),
@@ -142,6 +156,53 @@ const previewImport = async (kind, buffer) => {
         row.branchName = branch.name;
         row.branchId = branch._id.toString();
       }
+    }
+  }
+  if (kind === 'registrations') {
+    const extra = new Map();
+    const current = new Map();
+    for (const row of rows) {
+      if (!row.ok) continue;
+      const ors = [];
+      if (row.email) ors.push({ email: row.email });
+      if (row.registrationNumber) ors.push({ registrationNumber: row.registrationNumber });
+      const student = await User.findOne({ role: 'STUDENT', $or: ors });
+      if (!student) {
+        row.ok = false;
+        row.message = 'Student was not found. Upload students first.';
+        continue;
+      }
+      const course = await Course.findOne({ courseCode: row.courseCode });
+      if (!course) {
+        row.ok = false;
+        row.message = `Course ${row.courseCode} was not found. Upload courses first.`;
+        continue;
+      }
+      row.studentId = student._id.toString();
+      row.studentName = student.fullName;
+      row.email = student.email;
+      row.registrationNumber = student.registrationNumber || row.registrationNumber;
+      row.courseId = course._id.toString();
+      row.title = course.title;
+      if (student.dateSheetSaved) {
+        row.ok = false;
+        row.message = 'Date sheet is already saved';
+        continue;
+      }
+      const already = await CourseAssignment.findOne({ student: student._id, course: course._id });
+      if (already) {
+        row.message = 'Already registered';
+        continue;
+      }
+      const key = row.studentId;
+      if (!current.has(key)) current.set(key, await CourseAssignment.countDocuments({ student: student._id }));
+      const next = (extra.get(key) || 0) + 1;
+      if (current.get(key) + next > 6) {
+        row.ok = false;
+        row.message = 'Maximum 6 courses';
+        continue;
+      }
+      extra.set(key, next);
     }
   }
   return { kind, rows, ready: rows.filter((row) => row.ok).length, blocked: rows.filter((row) => !row.ok).length };
@@ -291,6 +352,37 @@ const commitSlots = async (rows) => {
   return results;
 };
 
+const commitRegistrations = async (rows) => {
+  const results = [];
+  for (const row of rows) {
+    if (!row.ok) {
+      results.push({ index: row.index, status: 'skipped', message: row.message });
+      continue;
+    }
+    if (!row.studentId || !row.courseId) {
+      results.push({ index: row.index, status: 'skipped', message: 'Student or course was not found' });
+      continue;
+    }
+    try {
+      const count = await CourseAssignment.countDocuments({ student: row.studentId });
+      const existing = await CourseAssignment.findOne({ student: row.studentId, course: row.courseId });
+      if (!existing && count >= 6) {
+        results.push({ index: row.index, status: 'skipped', message: 'Maximum 6 courses' });
+        continue;
+      }
+      await CourseAssignment.findOneAndUpdate(
+        { student: row.studentId, course: row.courseId },
+        { student: row.studentId, course: row.courseId },
+        { upsert: true, setDefaultsOnInsert: true }
+      );
+      results.push({ index: row.index, status: 'created', message: existing ? 'Already registered' : 'Registered' });
+    } catch (err) {
+      results.push({ index: row.index, status: 'skipped', message: err.code === 11000 ? 'Already registered' : 'Could not register course' });
+    }
+  }
+  return results;
+};
+
 const commitImport = async (kind, rows) => {
   if (!KINDS.includes(kind)) {
     const error = new Error('Unknown import type');
@@ -307,6 +399,7 @@ const commitImport = async (kind, rows) => {
     courses: commitCourses,
     students: commitStudents,
     slots: commitSlots,
+    registrations: commitRegistrations,
   };
   const results = await runners[kind](rows);
   return {

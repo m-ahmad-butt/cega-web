@@ -4,7 +4,8 @@ import AdminNavbar from '../../components/AdminNavbar';
 import ConfirmModal from '../../components/ConfirmModal';
 import { adminAPI } from '../../utils/api';
 import { useGuide, useWarn } from '../../components/GuideModal';
-import { ArrowLeft, Plus, Trash2, Loader2, X, AlertTriangle, KeyRound } from 'lucide-react';
+import { ArrowLeft, Plus, Trash2, Loader2, X, AlertTriangle, KeyRound, ScanLine, Upload } from 'lucide-react';
+import ImportSheet from '../../components/ImportSheet';
 
 const AdminStudentDetail = () => {
   const { id } = useParams();
@@ -22,6 +23,8 @@ const AdminStudentDetail = () => {
   const [editModalOpen, setEditModalOpen] = useState(false);
   const [editForm, setEditForm] = useState({});
   const [editSaving, setEditSaving] = useState(false);
+  const [ocrLoading, setOcrLoading] = useState(false);
+  const [importOpen, setImportOpen] = useState(false);
 
   const loadStudent = useCallback(async () => {
     try {
@@ -127,6 +130,32 @@ const AdminStudentDetail = () => {
 
   const setE = (k, v) => setEditForm((p) => ({ ...p, [k]: v }));
 
+  const handleCnicUpload = async (e) => {
+    const file = e.target.files?.[0];
+    e.target.value = '';
+    if (!file) return;
+    setOcrLoading(true);
+    try {
+      const form = new FormData();
+      form.append('cnic', file);
+      const { data } = await adminAPI.ocrCnic(form);
+      const fields = data.data || data;
+      setEditForm((p) => ({
+        ...p,
+        fullName: fields.fullName || p.fullName,
+        cnic: fields.cnic || p.cnic,
+        dob: fields.dob ? String(fields.dob).slice(0, 10) : p.dob,
+        gender: fields.gender || p.gender,
+        address: fields.address || p.address,
+      }));
+      say({ title: 'Done', body: 'CNIC fields filled. Review them, then save.', action: 'OK' });
+    } catch (err) {
+      warn(err.response?.data?.message || 'CNIC OCR failed');
+    } finally {
+      setOcrLoading(false);
+    }
+  };
+
   const assignedIds = assignments.map((a) => a.course?._id || a.courseId);
 
   if (loading) return (
@@ -216,7 +245,10 @@ const AdminStudentDetail = () => {
               <h3 className="text-lg font-semibold">Course Assignments</h3>
               <p className="text-sm text-notion-muted">{count}/6 courses assigned</p>
             </div>
-            <button onClick={openAssignModal} disabled={count >= 6} className="n-btn text-xs"><Plus size={14} /> Assign Course</button>
+            <div className="flex gap-2">
+              <button onClick={() => setImportOpen(true)} className="n-btn-secondary text-xs"><Upload size={14} /> Upload CSV</button>
+              <button onClick={openAssignModal} disabled={count >= 6} className="n-btn text-xs"><Plus size={14} /> Assign Course</button>
+            </div>
           </div>
 
           {(count < 4 || count > 6) && (
@@ -279,6 +311,14 @@ const AdminStudentDetail = () => {
             <button onClick={() => setEditModalOpen(false)} className="absolute right-4 top-4 text-notion-muted hover:text-notion-text"><X size={18} /></button>
             <h2 className="mb-4 text-lg font-semibold">Edit Student</h2>
             <form onSubmit={handleEditSave} className="space-y-3">
+              <div className="flex flex-wrap items-center gap-2 rounded-notion border border-dashed border-notion-border bg-notion-surface p-3">
+                <ScanLine size={16} className="text-notion-muted" />
+                <span className="text-sm text-notion-muted">Autofill from CNIC image</span>
+                <label className="n-btn-secondary cursor-pointer text-xs">
+                  {ocrLoading ? <Loader2 size={14} className="animate-spin" /> : 'Upload CNIC'}
+                  <input type="file" accept="image/jpeg,image/png,image/webp" className="hidden" disabled={ocrLoading} onChange={handleCnicUpload} />
+                </label>
+              </div>
               <div className="grid gap-3 sm:grid-cols-2">
                 <div><label className="n-label">Full Name</label><input value={editForm.fullName} onChange={(e) => setE('fullName', e.target.value)} className="n-input" /></div>
                 <div><label className="n-label">Phone</label><input value={editForm.phone} onChange={(e) => setE('phone', e.target.value)} className="n-input" /></div>
@@ -308,6 +348,17 @@ const AdminStudentDetail = () => {
       )}
 
       <ConfirmModal isOpen={!!removeTarget} onClose={() => setRemoveTarget(null)} onConfirm={handleRemove} title="Remove Assignment" message={`Remove "${removeTarget?.course?.title || removeTarget?.courseTitle}" from this student?`} confirmText="Remove" danger />
+      {importOpen && (
+        <ImportSheet
+          kind="registrations"
+          onClose={() => setImportOpen(false)}
+          onDone={(result) => {
+            setImportOpen(false);
+            say({ title: 'Import finished', body: `Added ${result.created || 0}. Skipped ${result.skipped || 0}.`, action: 'OK' });
+            loadAssignments();
+          }}
+        />
+      )}
     </div>
   );
 };

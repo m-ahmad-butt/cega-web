@@ -8,6 +8,11 @@ const HINTS = {
   courses: 'Columns: code, title, credit hours, department, status',
   students: 'Columns: name, roll, discipline, email, password, semester, branch',
   slots: 'Columns: course code, date, start time, end time, capacity',
+  registrations: 'Columns: student, email, roll, course code, title',
+};
+
+const TITLES = {
+  registrations: 'registered courses',
 };
 
 const ImportSheet = ({ kind, onClose, onDone }) => {
@@ -56,12 +61,15 @@ const ImportSheet = ({ kind, onClose, onDone }) => {
       ? ['Name', 'Code', 'City', 'Status']
       : kind === 'courses'
         ? ['Code', 'Title', 'Credits', 'Department', 'Level']
-        : ['Course', 'Date', 'Start', 'End', 'Capacity'];
+        : kind === 'registrations'
+          ? ['Student', 'Email', 'Roll', 'Course', 'Title']
+          : ['Course', 'Date', 'Start', 'End', 'Capacity'];
 
   const cells = (row) => {
     if (kind === 'students') return [row.fullName, row.registrationNumber, row.program, row.email, row.password, row.semester, row.branchName || row.branch];
     if (kind === 'branches') return [row.name, row.code, row.city, row.status];
     if (kind === 'courses') return [row.courseCode, row.title, row.creditHours, row.department, row.difficulty];
+    if (kind === 'registrations') return [row.studentName, row.email, row.registrationNumber, row.courseCode, row.title];
     return [row.courseCode, row.date, row.startTime, row.endTime, row.capacity];
   };
 
@@ -70,7 +78,7 @@ const ImportSheet = ({ kind, onClose, onDone }) => {
       <div className="n-card flex max-h-[85vh] w-full max-w-4xl flex-col overflow-hidden">
         <div className="flex items-center justify-between border-b border-notion-border px-5 py-4">
           <div>
-            <h2 className="text-base font-semibold">Upload {kind}</h2>
+            <h2 className="text-base font-semibold">Upload {TITLES[kind] || kind}</h2>
             <p className="text-xs text-notion-muted">{HINTS[kind]}. CSV or Excel.</p>
           </div>
           <button type="button" onClick={onClose} className="n-btn-ghost p-2"><X size={16} /></button>
@@ -97,7 +105,7 @@ const ImportSheet = ({ kind, onClose, onDone }) => {
                     <tr key={row.index}>
                       {cells(row).map((value, i) => <td key={i} className="n-td">{value || 'Not set'}</td>)}
                       <td className={`n-td text-xs ${row.ok ? 'text-notion-green' : 'text-notion-red'}`}>
-                        {row.ok ? 'Ready' : row.message}
+                        {row.ok ? (row.message || 'Ready') : row.message}
                       </td>
                     </tr>
                   ))}

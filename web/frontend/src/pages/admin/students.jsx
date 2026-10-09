@@ -30,7 +30,7 @@ const AdminStudents = () => {
   const [saving, setSaving] = useState(false);
   const [ocrLoading, setOcrLoading] = useState(false);
   const [deleteTarget, setDeleteTarget] = useState(null);
-  const [importOpen, setImportOpen] = useState(false);
+  const [importKind, setImportKind] = useState(null);
 
   const load = useCallback(async () => {
     setLoading(true);
@@ -146,7 +146,8 @@ const AdminStudents = () => {
           <h1 className="text-2xl font-bold tracking-tight">Students</h1>
           <div className="flex flex-wrap gap-2">
             <button onClick={() => deliverPasswords()} className="n-btn-secondary"><Mail size={16} /> Send all</button>
-            <button onClick={() => setImportOpen(true)} className="n-btn-secondary"><Upload size={16} /> Upload</button>
+            <button onClick={() => setImportKind('students')} className="n-btn-secondary"><Upload size={16} /> Upload students</button>
+            <button onClick={() => setImportKind('registrations')} className="n-btn-secondary"><Upload size={16} /> Upload courses</button>
             <button onClick={openAdd} className="n-btn"><Plus size={16} /> Add Student</button>
           </div>
         </div>
@@ -290,12 +291,12 @@ const AdminStudents = () => {
       )}
 
       <ConfirmModal isOpen={!!deleteTarget} onClose={() => setDeleteTarget(null)} onConfirm={handleDelete} title="Delete Student" message={`Delete "${deleteTarget?.fullName}"? This cannot be undone.`} confirmText="Delete" danger />
-      {importOpen && (
+      {importKind && (
         <ImportSheet
-          kind="students"
-          onClose={() => setImportOpen(false)}
+          kind={importKind}
+          onClose={() => setImportKind(null)}
           onDone={(result) => {
-            setImportOpen(false);
+            setImportKind(null);
             say({ title: 'Import finished', body: `Added ${result.created || 0}. Skipped ${result.skipped || 0}.`, action: 'OK' });
             load();
           }}
