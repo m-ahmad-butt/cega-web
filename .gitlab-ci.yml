@@ -56,13 +56,8 @@ build:backend:
     - web-staging
   script:
     - chmod +x scripts/ci/*.sh scripts/*.sh 2>/dev/null || true
-    - |
-      if [ -z "${BACKEND_ENV:-}" ] || [ ! -f "${BACKEND_ENV}" ]; then
-        echo "Missing CI variable BACKEND_ENV (Type: File)."
-        exit 1
-      fi
-    - cp "${BACKEND_ENV}" backend/.env
-    - docker compose -f "$COMPOSE_FILE" --env-file backend/.env build backend
+    - bash scripts/ci/write-env.sh
+    - docker compose -f "$COMPOSE_FILE" --env-file backend/.env --env-file frontend/.env --env-file agent/.env build backend
   rules:
     - if: $CI_COMMIT_BRANCH == "main"
       when: manual
@@ -75,13 +70,8 @@ build:frontend:
     - web-staging
   script:
     - chmod +x scripts/ci/*.sh scripts/*.sh 2>/dev/null || true
-    - |
-      if [ -z "${FRONTEND_ENV:-}" ] || [ ! -f "${FRONTEND_ENV}" ]; then
-        echo "Missing CI variable FRONTEND_ENV (Type: File)."
-        exit 1
-      fi
-    - cp "${FRONTEND_ENV}" frontend/.env
-    - docker compose -f "$COMPOSE_FILE" --env-file frontend/.env build frontend
+    - bash scripts/ci/write-env.sh
+    - docker compose -f "$COMPOSE_FILE" --env-file backend/.env --env-file frontend/.env --env-file agent/.env build frontend
   rules:
     - if: $CI_COMMIT_BRANCH == "main"
       when: manual
@@ -93,7 +83,9 @@ build:agent:
   tags:
     - web-staging
   script:
-    - docker compose -f "$COMPOSE_FILE" build agent
+    - chmod +x scripts/ci/*.sh scripts/*.sh 2>/dev/null || true
+    - bash scripts/ci/write-env.sh
+    - docker compose -f "$COMPOSE_FILE" --env-file backend/.env --env-file frontend/.env --env-file agent/.env build agent
   rules:
     - if: $CI_COMMIT_BRANCH == "main"
       when: manual
@@ -113,8 +105,8 @@ test:unit:
   variables:
     COMPOSE_PROJECT_NAME: "web-comp-ci"
   script:
-    - cp "${BACKEND_ENV}" backend/.env
-    - docker compose -f "$COMPOSE_FILE" -f "$COMPOSE_CI_FILE" --env-file backend/.env run --rm --no-deps backend npm run test:unit
+    - bash scripts/ci/write-env.sh
+    - docker compose -f "$COMPOSE_FILE" -f "$COMPOSE_CI_FILE" --env-file backend/.env --env-file frontend/.env --env-file agent/.env run --rm --no-deps backend npm run test:unit
   rules:
     - if: $CI_COMMIT_BRANCH == "main"
       when: manual
@@ -131,17 +123,10 @@ test:smoke:
   variables:
     COMPOSE_PROJECT_NAME: "web-comp-ci"
   script:
-    - |
-      if [ -z "${AGENT_ENV:-}" ] || [ ! -f "${AGENT_ENV}" ]; then
-        echo "Missing CI variable AGENT_ENV (Type: File)."
-        exit 1
-      fi
-    - cp "${BACKEND_ENV}" backend/.env
-    - cp "${FRONTEND_ENV}" frontend/.env
-    - cp "${AGENT_ENV}" agent/.env
+    - bash scripts/ci/write-env.sh
     - |
       set -e
-      COMPOSE="docker compose -p web-comp-ci -f $COMPOSE_FILE -f $COMPOSE_CI_FILE --env-file backend/.env --env-file frontend/.env"
+      COMPOSE="docker compose -p web-comp-ci -f $COMPOSE_FILE -f $COMPOSE_CI_FILE --env-file backend/.env --env-file frontend/.env --env-file agent/.env"
       health() { docker inspect -f '{{if .State.Health}}{{.State.Health.Status}}{{else}}{{.State.Status}}{{end}}' "$1" 2>/dev/null || echo missing; }
       mongo_ping() { docker exec ci-mongodb mongosh --quiet --eval 'quit(db.runCommand({ ping: 1 }).ok ? 0 : 2)' >/dev/null 2>&1; }
       redis_ping() { docker exec ci-redis redis-cli -a 123123123 ping 2>/dev/null | grep -q PONG; }
