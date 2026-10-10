@@ -14,6 +14,9 @@ override.tf.json
 *.tfvars.json
 !*.tfvars.example
 
+ssh.ps1
+ssh-stage.ps1
+
 # Secrets. *.env.example stays tracked.
 .env
 .env.*
